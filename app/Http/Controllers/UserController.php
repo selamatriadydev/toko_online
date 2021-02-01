@@ -11,10 +11,20 @@ class UserController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
         $list_user = User::paginate(10);
-        return view('users.index', ['list_user'=> $list_user]);
+        $filter_keyword = $request->get('keyword');
+        $keyword_status = $request->get('status');
+
+        if($filter_keyword){
+            if($keyword_status){
+                $list_user = User::where('email', 'LIKE', "%$filter_keyword%")->where('status', $keyword_status)->paginate(10);
+            }else{
+                $list_user = User::where('email', 'LIKE', "%$filter_keyword%")->paginate(10);
+            }
+        }
+        return view('users.index', ['list_user'=> $list_user, 'keyword'=> $filter_keyword, 'keyword_status'=> $keyword_status ]);
     }
 
     /**
@@ -61,7 +71,7 @@ class UserController extends Controller
      */
     public function show($id)
     {
-        $lihat_user = User::findOrFail($id);
+        $lihat_user = User::findOrFail($id);//cari user dengan id, jika ada lanjut jika tidak tampilkan error
         return view('users.show', ['user' => $lihat_user]);
     }
 
@@ -94,6 +104,7 @@ class UserController extends Controller
         $ubah_user->address = $request->get('address');
         $ubah_user->phone = $request->get('phone');
         $ubah_user->email = $request->get('email');
+        $ubah_user->status = $request->get('status');
         if($request->file('avatar')){//handle upload
             if($ubah_user->avatar && file_exists(storage_path('app/public'. $ubah_user->avatar)) ){//cek jika user memiliki file avatar diserver kita, jika ada maka hapus
                 \Storage::delete('public/'.$ubah_user->avatar );

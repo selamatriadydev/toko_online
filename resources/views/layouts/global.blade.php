@@ -75,8 +75,9 @@
 
             <ul class="polished-sidebar-menu ml-0 pt-4 p-0 d-md-block">
               <input class="border-dark form-control d-block d-md-none mb-4" type="text" placeholder="Search" aria-label="Search" />
-              <li class="active"><a href="/"><span class="oi oi-home"></span> Home</a></li>
-              <li><a href="/users"><span class="oi oi-dashboard"></span> User</a></li>
+              <li class="active"><a href="/home"><span class="oi oi-home"></span> Home</a></li>
+              <li><a href="/users"><span class="oi oi-people"></span>Manage User</a></li>
+              <li><a href="/categories"><span class="oi oi-tag"></span>Manage Category</a></li>
               {{-- <li><a href="charts.html"><span class="oi oi-pie-chart"></span> Charts</a></li>
               <li><a href="widgets.html"><span class="oi oi-puzzle-piece"></span></span> Widget / UI</a></li>
               <li><a href="forms.html"><span class="oi oi-browser"></span> Forms</a></li>

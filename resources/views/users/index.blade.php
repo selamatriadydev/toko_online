@@ -8,6 +8,28 @@
 @section('pageTitle')
     List User halaman 201
 @endsection
+<form action="{{ route('users.index') }}">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="input-group">
+                <input type="text" name="keyword" id="keyword" value="{{ $keyword }}" placeholder="Filter berdasarkan email" class="form-control col-md-10">
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="input-group">
+                <input type="radio" {{ $keyword_status=="ACTIVE" ? "checked": "" }} class="form-control" id="ACTIVE" value="ACTIVE" name="status" >
+                <label for="ACTIVE">Active</label>
+                <input type="radio" {{ $keyword_status=="INACTIVE" ? "checked": "" }} class="form-control" id="INACTIVE" value="INACTIVE" name="status" >
+                <label for="INACTIVE">Inactive</label>
+                <div class="input-group-append">
+                    <input type="submit" value="Filter" class="btn btn-primary">
+                    <a class="btn btn-warning" href="/users">Reset</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+<br>
 <a class="btn btn-primary mb-2" href="{{ route('users.create') }}">Tambah</a>
 @if (session('status'))
     <div class="alert alert-success">
@@ -22,13 +44,14 @@
         <th scope="col">Username</th>
         <th scope="col">Email</th>
         <th scope="col">Avatar</th>
+        <th scope="col">Status</th>
         <th scope="col">Action</th>
       </tr>
     </thead>
     <tbody>
-        @foreach ($list_user as $user)
+        @foreach ($list_user as $key=> $user)
            <tr>
-             <th scope="row">1</th>
+             <th scope="row">{{ $key+1 }}</th>
              <td>{{ $user->name }}</td>
              <td>{{ $user->username }}</td>
              <td>{{ $user->email }}</td>
@@ -38,6 +61,13 @@
                 @else
                 N/A
                  @endif
+             </td>
+             <td>
+                @if ($user->status == "ACTIVE")
+                    <span class="badge badge-success">{{ $user->status }}</span>
+                @else
+                    <span class="badge badge-danger">{{ $user->status }}</span>
+                @endif
              </td>
              <td>
                 <a class="btn btn-info mb-2" href="{{ route('users.show', ['id'=> $user->id ]) }}">Detail</a>
@@ -51,5 +81,14 @@
            </tr>
         @endforeach
     </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="7">
+                {{-- setelah pindah paginasi keyword pencarian hilang, tambahkan appens supaya tidak hilang  --}}
+                {{ $list_user->appends(Request::all())->links() }}
+            </td>
+        </tr>
+    </tfoot>
 </table>
+
 @endsection
