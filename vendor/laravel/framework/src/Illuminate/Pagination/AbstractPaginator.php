@@ -3,15 +3,19 @@
 namespace Illuminate\Pagination;
 
 use Closure;
-use Illuminate\Support\Str;
-use Illuminate\Support\Collection;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+use Illuminate\Support\Traits\ForwardsCalls;
 
 /**
  * @mixin \Illuminate\Support\Collection
  */
 abstract class AbstractPaginator implements Htmlable
 {
+    use ForwardsCalls;
+
     /**
      * All of the items being paginated.
      *
@@ -60,6 +64,20 @@ abstract class AbstractPaginator implements Htmlable
      * @var string
      */
     protected $pageName = 'page';
+
+    /**
+     * The number of links to display on each side of current page link.
+     *
+     * @var int
+     */
+    public $onEachSide = 3;
+
+    /**
+     * The paginator options.
+     *
+     * @var array
+     */
+    protected $options;
 
     /**
      * The current path resolver callback.
@@ -154,9 +172,9 @@ abstract class AbstractPaginator implements Htmlable
             $parameters = array_merge($this->query, $parameters);
         }
 
-        return $this->path
-                        .(Str::contains($this->path, '?') ? '&' : '?')
-                        .http_build_query($parameters, '', '&')
+        return $this->path()
+                        .(Str::contains($this->path(), '?') ? '&' : '?')
+                        .Arr::query($parameters)
                         .$this->buildFragment();
     }
 
@@ -180,12 +198,16 @@ abstract class AbstractPaginator implements Htmlable
     /**
      * Add a set of query string values to the paginator.
      *
-     * @param  array|string  $key
+     * @param  array|string|null  $key
      * @param  string|null  $value
      * @return $this
      */
     public function appends($key, $value = null)
     {
+        if (is_null($key)) {
+            return $this;
+        }
+
         if (is_array($key)) {
             return $this->appendArray($key);
         }
@@ -237,7 +259,7 @@ abstract class AbstractPaginator implements Htmlable
     /**
      * Load a set of relationships onto the mixed relationship collection.
      *
-     * @param  string $relation
+     * @param  string  $relation
      * @param  array  $relations
      * @return $this
      */
@@ -366,6 +388,29 @@ abstract class AbstractPaginator implements Htmlable
     }
 
     /**
+     * Set the number of links to display on each side of current page link.
+     *
+     * @param  int  $count
+     * @return $this
+     */
+    public function onEachSide($count)
+    {
+        $this->onEachSide = $count;
+
+        return $this;
+    }
+
+    /**
+     * Get the base path for paginator generated URLs.
+     *
+     * @return string|null
+     */
+    public function path()
+    {
+        return $this->path;
+    }
+
+    /**
      * Resolve the current request path or return the default value.
      *
      * @param  string  $default
@@ -401,7 +446,7 @@ abstract class AbstractPaginator implements Htmlable
     public static function resolveCurrentPage($pageName = 'page', $default = 1)
     {
         if (isset(static::$currentPageResolver)) {
-            return call_user_func(static::$currentPageResolver, $pageName);
+            return (int) call_user_func(static::$currentPageResolver, $pageName);
         }
 
         return $default;
@@ -536,6 +581,16 @@ abstract class AbstractPaginator implements Htmlable
     }
 
     /**
+     * Get the paginator options.
+     *
+     * @return array
+     */
+    public function getOptions()
+    {
+        return $this->options;
+    }
+
+    /**
      * Determine if the given item exists.
      *
      * @param  mixed  $key
@@ -599,7 +654,7 @@ abstract class AbstractPaginator implements Htmlable
      */
     public function __call($method, $parameters)
     {
-        return $this->getCollection()->$method(...$parameters);
+        return $this->forwardCallTo($this->getCollection(), $method, $parameters);
     }
 
     /**

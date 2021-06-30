@@ -3,13 +3,10 @@
 namespace Illuminate\Database\Eloquent\Relations;
 
 use BadMethodCallException;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 
-/**
- * @mixin \Illuminate\Database\Eloquent\Builder
- */
 class MorphTo extends BelongsTo
 {
     /**
@@ -39,6 +36,13 @@ class MorphTo extends BelongsTo
      * @var array
      */
     protected $macroBuffer = [];
+
+    /**
+     * A map of relations to load for each individual morph type.
+     *
+     * @var array
+     */
+    protected $morphableEagerLoads = [];
 
     /**
      * Create a new morph to relationship instance.
@@ -87,16 +91,6 @@ class MorphTo extends BelongsTo
     /**
      * Get the results of the relationship.
      *
-     * @return mixed
-     */
-    public function getResults()
-    {
-        return $this->ownerKey ? parent::getResults() : null;
-    }
-
-    /**
-     * Get the results of the relationship.
-     *
      * Called via eager load method of Eloquent query builder.
      *
      * @return mixed
@@ -124,9 +118,14 @@ class MorphTo extends BelongsTo
 
         $query = $this->replayMacros($instance->newQuery())
                             ->mergeConstraintsFrom($this->getQuery())
-                            ->with($this->getQuery()->getEagerLoads());
+                            ->with(array_merge(
+                                $this->getQuery()->getEagerLoads(),
+                                (array) ($this->morphableEagerLoads[get_class($instance)] ?? [])
+                            ));
 
-        return $query->whereIn(
+        $whereIn = $this->whereInMethod($instance, $ownerKey);
+
+        return $query->{$whereIn}(
             $instance->getTable().'.'.$ownerKey, $this->gatherKeysByType($type)
         )->get();
     }
@@ -139,9 +138,7 @@ class MorphTo extends BelongsTo
      */
     protected function gatherKeysByType($type)
     {
-        return collect($this->dictionary[$type])->map(function ($models) {
-            return head($models)->{$this->foreignKey};
-        })->values()->unique()->all();
+        return array_keys($this->dictionary[$type]);
     }
 
     /**
@@ -154,13 +151,17 @@ class MorphTo extends BelongsTo
     {
         $class = Model::getActualClassNameForMorph($type);
 
-        return new $class;
+        return tap(new $class, function ($instance) {
+            if (! $instance->getConnectionName()) {
+                $instance->setConnection($this->getConnection()->getName());
+            }
+        });
     }
 
     /**
      * Match the eagerly loaded results to their parents.
      *
-     * @param  array   $models
+     * @param  array  $models
      * @param  \Illuminate\Database\Eloquent\Collection  $results
      * @param  string  $relation
      * @return array
@@ -184,7 +185,7 @@ class MorphTo extends BelongsTo
 
             if (isset($this->dictionary[$type][$ownerKey])) {
                 foreach ($this->dictionary[$type][$ownerKey] as $model) {
-                    $model->setRelation($this->relation, $result);
+                    $model->setRelation($this->relationName, $result);
                 }
             }
         }
@@ -206,7 +207,7 @@ class MorphTo extends BelongsTo
             $this->morphType, $model instanceof Model ? $model->getMorphClass() : null
         );
 
-        return $this->parent->setRelation($this->relation, $model);
+        return $this->parent->setRelation($this->relationName, $model);
     }
 
     /**
@@ -220,7 +221,7 @@ class MorphTo extends BelongsTo
 
         $this->parent->setAttribute($this->morphType, null);
 
-        return $this->parent->setRelation($this->relation, null);
+        return $this->parent->setRelation($this->relationName, null);
     }
 
     /**
@@ -230,27 +231,20 @@ class MorphTo extends BelongsTo
      */
     public function touch()
     {
-        if (! is_null($this->ownerKey)) {
+        if (! is_null($this->child->{$this->foreignKey})) {
             parent::touch();
         }
     }
 
     /**
-     * Remove all or passed registered global scopes.
+     * Make a new related instance for the given model.
      *
-     * @param  array|null  $scopes
-     * @return $this
+     * @param  \Illuminate\Database\Eloquent\Model  $parent
+     * @return \Illuminate\Database\Eloquent\Model
      */
-    public function withoutGlobalScopes(array $scopes = null)
+    protected function newRelatedInstanceFor(Model $parent)
     {
-        $this->getQuery()->withoutGlobalScopes($scopes);
-
-        $this->macroBuffer[] = [
-            'method' => __FUNCTION__,
-            'parameters' => [$scopes],
-        ];
-
-        return $this;
+        return $parent->{$this->getRelationName()}()->getRelated()->newInstance();
     }
 
     /**
@@ -274,6 +268,21 @@ class MorphTo extends BelongsTo
     }
 
     /**
+     * Specify which relations to load for a given morph type.
+     *
+     * @param  array  $with
+     * @return \Illuminate\Database\Eloquent\Relations\MorphTo
+     */
+    public function morphWith(array $with)
+    {
+        $this->morphableEagerLoads = array_merge(
+            $this->morphableEagerLoads, $with
+        );
+
+        return $this;
+    }
+
+    /**
      * Replay stored macro calls on the actual related instance.
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query
@@ -292,13 +301,19 @@ class MorphTo extends BelongsTo
      * Handle dynamic method calls to the relationship.
      *
      * @param  string  $method
-     * @param  array   $parameters
+     * @param  array  $parameters
      * @return mixed
      */
     public function __call($method, $parameters)
     {
         try {
-            return parent::__call($method, $parameters);
+            $result = parent::__call($method, $parameters);
+
+            if (in_array($method, ['select', 'selectRaw', 'selectSub', 'addSelect', 'withoutGlobalScopes'])) {
+                $this->macroBuffer[] = compact('method', 'parameters');
+            }
+
+            return $result;
         }
 
         // If we tried to call a method that does not exist on the parent Builder instance,

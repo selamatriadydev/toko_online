@@ -2,11 +2,12 @@
 
 namespace Illuminate\Database\Schema\Grammars;
 
-use RuntimeException;
-use Illuminate\Support\Fluent;
 use Doctrine\DBAL\Schema\Index;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Fluent;
+use RuntimeException;
 
 class SQLiteGrammar extends Grammar
 {
@@ -178,6 +179,8 @@ class SQLiteGrammar extends Grammar
      *
      * @param  \Illuminate\Database\Schema\Blueprint  $blueprint
      * @param  \Illuminate\Support\Fluent  $command
+     * @return void
+     *
      * @throws \RuntimeException
      */
     public function compileSpatialIndex(Blueprint $blueprint, Fluent $command)
@@ -242,6 +245,16 @@ class SQLiteGrammar extends Grammar
     }
 
     /**
+     * Compile the SQL needed to rebuild the database.
+     *
+     * @return string
+     */
+    public function compileRebuild()
+    {
+        return 'vacuum';
+    }
+
+    /**
      * Compile a drop column command.
      *
      * @param  \Illuminate\Database\Schema\Blueprint  $blueprint
@@ -297,6 +310,8 @@ class SQLiteGrammar extends Grammar
      *
      * @param  \Illuminate\Database\Schema\Blueprint  $blueprint
      * @param  \Illuminate\Support\Fluent  $command
+     * @return void
+     *
      * @throws \RuntimeException
      */
     public function compileDropSpatialIndex(Blueprint $blueprint, Fluent $command)
@@ -321,10 +336,12 @@ class SQLiteGrammar extends Grammar
     /**
      * Compile a rename index command.
      *
-     * @param  \Illuminate\Database\Schema\Blueprint $blueprint
-     * @param  \Illuminate\Support\Fluent $command
-     * @param  \Illuminate\Database\Connection $connection
+     * @param  \Illuminate\Database\Schema\Blueprint  $blueprint
+     * @param  \Illuminate\Support\Fluent  $command
+     * @param  \Illuminate\Database\Connection  $connection
      * @return array
+     *
+     * @throws \RuntimeException
      */
     public function compileRenameIndex(Blueprint $blueprint, Fluent $command, Connection $connection)
     {
@@ -332,7 +349,7 @@ class SQLiteGrammar extends Grammar
 
         $indexes = $schemaManager->listTableIndexes($this->getTablePrefix().$blueprint->getTable());
 
-        $index = array_get($indexes, $command->from);
+        $index = Arr::get($indexes, $command->from);
 
         if (! $index) {
             throw new RuntimeException("Index [{$command->from}] does not exist.");
@@ -601,7 +618,7 @@ class SQLiteGrammar extends Grammar
      */
     protected function typeDateTime(Fluent $column)
     {
-        return 'datetime';
+        return $this->typeTimestamp($column);
     }
 
     /**
