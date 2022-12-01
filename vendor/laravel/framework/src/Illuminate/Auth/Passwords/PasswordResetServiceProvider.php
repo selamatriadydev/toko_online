@@ -2,11 +2,17 @@
 
 namespace Illuminate\Auth\Passwords;
 
-use Illuminate\Contracts\Support\DeferrableProvider;
 use Illuminate\Support\ServiceProvider;
 
-class PasswordResetServiceProvider extends ServiceProvider implements DeferrableProvider
+class PasswordResetServiceProvider extends ServiceProvider
 {
+    /**
+     * Indicates if loading of the provider is deferred.
+     *
+     * @var bool
+     */
+    protected $defer = true;
+
     /**
      * Register the service provider.
      *

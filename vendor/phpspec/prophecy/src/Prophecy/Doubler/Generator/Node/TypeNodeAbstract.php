@@ -56,10 +56,12 @@ abstract class TypeNodeAbstract
 
             //  built in types
             case 'self':
+            case 'static':
             case 'array':
             case 'callable':
             case 'bool':
             case 'false':
+            case 'true':
             case 'float':
             case 'int':
             case 'string':
@@ -77,16 +79,26 @@ abstract class TypeNodeAbstract
 
     protected function guardIsValidType()
     {
-        if ($this->types == ['null' => 'null']) {
-            throw new DoubleException('Type cannot be standalone null');
-        }
+        if (\PHP_VERSION_ID < 80200) {
+            if ($this->types == ['null' => 'null']) {
+                throw new DoubleException('Type cannot be standalone null');
+            }
 
-        if ($this->types == ['false' => 'false']) {
-            throw new DoubleException('Type cannot be standalone false');
-        }
+            if ($this->types == ['false' => 'false']) {
+                throw new DoubleException('Type cannot be standalone false');
+            }
 
-        if ($this->types == ['false' => 'false', 'null' => 'null']) {
-            throw new DoubleException('Type cannot be nullable false');
+            if ($this->types == ['false' => 'false', 'null' => 'null']) {
+                throw new DoubleException('Type cannot be nullable false');
+            }
+
+            if ($this->types == ['true' => 'true']) {
+                throw new DoubleException('Type cannot be standalone true');
+            }
+
+            if ($this->types == ['true' => 'true', 'null' => 'null']) {
+                throw new DoubleException('Type cannot be nullable true');
+            }
         }
 
         if (\PHP_VERSION_ID >= 80000 && isset($this->types['mixed']) && count($this->types) !== 1) {

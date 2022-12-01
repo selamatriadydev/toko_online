@@ -2,9 +2,8 @@
 
 namespace Illuminate\Database\Query\Grammars;
 
-use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
+use Illuminate\Database\Query\Builder;
 
 class PostgresGrammar extends Grammar
 {
@@ -20,27 +19,6 @@ class PostgresGrammar extends Grammar
         '&&', '@>', '<@', '?', '?|', '?&', '||', '-', '-', '#-',
         'is distinct from', 'is not distinct from',
     ];
-
-    /**
-     * {@inheritdoc}
-     *
-     * @param  \Illuminate\Database\Query\Builder  $query
-     * @param  array  $where
-     * @return string
-     */
-    protected function whereBasic(Builder $query, $where)
-    {
-        if (Str::contains(strtolower($where['operator']), 'like')) {
-            return sprintf(
-                '%s::text %s %s',
-                $this->wrap($where['column']),
-                $where['operator'],
-                $this->parameter($where['value'])
-            );
-        }
-
-        return parent::whereBasic($query, $where);
-    }
 
     /**
      * Compile a "where date" clause.
@@ -86,33 +64,6 @@ class PostgresGrammar extends Grammar
     }
 
     /**
-     * Compile the "select *" portion of the query.
-     *
-     * @param  \Illuminate\Database\Query\Builder  $query
-     * @param  array  $columns
-     * @return string|null
-     */
-    protected function compileColumns(Builder $query, $columns)
-    {
-        // If the query is actually performing an aggregating select, we will let that
-        // compiler handle the building of the select clauses, as it will need some
-        // more syntax that is best handled by that function to keep things neat.
-        if (! is_null($query->aggregate)) {
-            return;
-        }
-
-        if (is_array($query->distinct)) {
-            $select = 'select distinct on ('.$this->columnize($query->distinct).') ';
-        } elseif ($query->distinct) {
-            $select = 'select distinct ';
-        } else {
-            $select = 'select ';
-        }
-
-        return $select.$this->columnize($columns);
-    }
-
-    /**
      * Compile a "JSON contains" statement into SQL.
      *
      * @param  string  $column
@@ -124,21 +75,6 @@ class PostgresGrammar extends Grammar
         $column = str_replace('->>', '->', $this->wrap($column));
 
         return '('.$column.')::jsonb @> '.$value;
-    }
-
-    /**
-     * Compile a "JSON length" statement into SQL.
-     *
-     * @param  string  $column
-     * @param  string  $operator
-     * @param  string  $value
-     * @return string
-     */
-    protected function compileJsonLength($column, $operator, $value)
-    {
-        $column = str_replace('->>', '->', $this->wrap($column));
-
-        return 'json_array_length(('.$column.')::json) '.$operator.' '.$value;
     }
 
     /**
@@ -158,28 +94,32 @@ class PostgresGrammar extends Grammar
     }
 
     /**
-     * Compile an insert ignore statement into SQL.
-     *
-     * @param  \Illuminate\Database\Query\Builder  $query
-     * @param  array  $values
-     * @return string
+     * {@inheritdoc}
      */
-    public function compileInsertOrIgnore(Builder $query, array $values)
+    public function compileInsert(Builder $query, array $values)
     {
-        return $this->compileInsert($query, $values).' on conflict do nothing';
+        $table = $this->wrapTable($query->from);
+
+        return empty($values)
+                ? "insert into {$table} DEFAULT VALUES"
+                : parent::compileInsert($query, $values);
     }
 
     /**
      * Compile an insert and get ID statement into SQL.
      *
      * @param  \Illuminate\Database\Query\Builder  $query
-     * @param  array  $values
+     * @param  array   $values
      * @param  string  $sequence
      * @return string
      */
     public function compileInsertGetId(Builder $query, $values, $sequence)
     {
-        return $this->compileInsert($query, $values).' returning '.$this->wrap($sequence ?: 'id');
+        if (is_null($sequence)) {
+            $sequence = 'id';
+        }
+
+        return $this->compileInsert($query, $values).' returning '.$this->wrap($sequence);
     }
 
     /**
@@ -189,71 +129,110 @@ class PostgresGrammar extends Grammar
      * @param  array  $values
      * @return string
      */
-    public function compileUpdate(Builder $query, array $values)
+    public function compileUpdate(Builder $query, $values)
     {
-        if (isset($query->joins) || isset($query->limit)) {
-            return $this->compileUpdateWithJoinsOrLimit($query, $values);
-        }
+        $table = $this->wrapTable($query->from);
 
-        return parent::compileUpdate($query, $values);
+        // Each one of the columns in the update statements needs to be wrapped in the
+        // keyword identifiers, also a place-holder needs to be created for each of
+        // the values in the list of bindings so we can make the sets statements.
+        $columns = $this->compileUpdateColumns($values);
+
+        $from = $this->compileUpdateFrom($query);
+
+        $where = $this->compileUpdateWheres($query);
+
+        return trim("update {$table} set {$columns}{$from} {$where}");
     }
 
     /**
-     * Compile the columns for an update statement.
+     * Compile the columns for the update statement.
      *
-     * @param  \Illuminate\Database\Query\Builder  $query
-     * @param  array  $values
+     * @param  array   $values
      * @return string
      */
-    protected function compileUpdateColumns(Builder $query, array $values)
+    protected function compileUpdateColumns($values)
     {
+        // When gathering the columns for an update statement, we'll wrap each of the
+        // columns and convert it to a parameter value. Then we will concatenate a
+        // list of the columns that can be added into this update query clauses.
         return collect($values)->map(function ($value, $key) {
-            $column = last(explode('.', $key));
-
-            if ($this->isJsonSelector($key)) {
-                return $this->compileJsonUpdateColumn($column, $value);
-            }
-
-            return $this->wrap($column).' = '.$this->parameter($value);
+            return $this->wrap($key).' = '.$this->parameter($value);
         })->implode(', ');
     }
 
     /**
-     * Prepares a JSON column being updated using the JSONB_SET function.
+     * Compile the "from" clause for an update with a join.
      *
-     * @param  string  $key
-     * @param  mixed  $value
-     * @return string
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @return string|null
      */
-    protected function compileJsonUpdateColumn($key, $value)
+    protected function compileUpdateFrom(Builder $query)
     {
-        $segments = explode('->', $key);
+        if (! isset($query->joins)) {
+            return '';
+        }
 
-        $field = $this->wrap(array_shift($segments));
+        // When using Postgres, updates with joins list the joined tables in the from
+        // clause, which is different than other systems like MySQL. Here, we will
+        // compile out the tables that are joined and add them to a from clause.
+        $froms = collect($query->joins)->map(function ($join) {
+            return $this->wrapTable($join->table);
+        })->all();
 
-        $path = '\'{"'.implode('","', $segments).'"}\'';
-
-        return "{$field} = jsonb_set({$field}::jsonb, {$path}, {$this->parameter($value)})";
+        if (count($froms) > 0) {
+            return ' from '.implode(', ', $froms);
+        }
     }
 
     /**
-     * Compile an update statement with joins or limit into SQL.
+     * Compile the additional where clauses for updates with joins.
      *
      * @param  \Illuminate\Database\Query\Builder  $query
-     * @param  array  $values
      * @return string
      */
-    protected function compileUpdateWithJoinsOrLimit(Builder $query, array $values)
+    protected function compileUpdateWheres(Builder $query)
     {
-        $table = $this->wrapTable($query->from);
+        $baseWheres = $this->compileWheres($query);
 
-        $columns = $this->compileUpdateColumns($query, $values);
+        if (! isset($query->joins)) {
+            return $baseWheres;
+        }
 
-        $alias = last(preg_split('/\s+as\s+/i', $query->from));
+        // Once we compile the join constraints, we will either use them as the where
+        // clause or append them to the existing base where clauses. If we need to
+        // strip the leading boolean we will do so when using as the only where.
+        $joinWheres = $this->compileUpdateJoinWheres($query);
 
-        $selectSql = $this->compileSelect($query->select($alias.'.ctid'));
+        if (trim($baseWheres) == '') {
+            return 'where '.$this->removeLeadingBoolean($joinWheres);
+        }
 
-        return "update {$table} set {$columns} where {$this->wrap('ctid')} in ({$selectSql})";
+        return $baseWheres.' '.$joinWheres;
+    }
+
+    /**
+     * Compile the "join" clause where clauses for an update.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @return string
+     */
+    protected function compileUpdateJoinWheres(Builder $query)
+    {
+        $joinWheres = [];
+
+        // Here we will just loop through all of the join constraints and compile them
+        // all out then implode them. This should give us "where" like syntax after
+        // everything has been built and then we will join it to the real wheres.
+        foreach ($query->joins as $join) {
+            foreach ($join->wheres as $where) {
+                $method = "where{$where['type']}";
+
+                $joinWheres[] = $where['boolean'].' '.$this->$method($query, $where);
+            }
+        }
+
+        return implode(' ', $joinWheres);
     }
 
     /**
@@ -265,16 +244,13 @@ class PostgresGrammar extends Grammar
      */
     public function prepareBindingsForUpdate(array $bindings, array $values)
     {
-        $values = collect($values)->map(function ($value, $column) {
-            return is_array($value) || ($this->isJsonSelector($column) && ! $this->isExpression($value))
-                ? json_encode($value)
-                : $value;
-        })->all();
-
-        $cleanBindings = Arr::except($bindings, 'select');
+        // Update statements with "joins" in Postgres use an interesting syntax. We need to
+        // take all of the bindings and put them on the end of this array since they are
+        // added to the end of the "where" clause statements as typical where clauses.
+        $bindingsWithoutJoin = Arr::except($bindings, 'join');
 
         return array_values(
-            array_merge($values, Arr::flatten($cleanBindings))
+            array_merge($values, $bindings['join'], Arr::flatten($bindingsWithoutJoin))
         );
     }
 
@@ -286,28 +262,29 @@ class PostgresGrammar extends Grammar
      */
     public function compileDelete(Builder $query)
     {
-        if (isset($query->joins) || isset($query->limit)) {
-            return $this->compileDeleteWithJoinsOrLimit($query);
-        }
+        $table = $this->wrapTable($query->from);
 
-        return parent::compileDelete($query);
+        return isset($query->joins)
+            ? $this->compileDeleteWithJoins($query, $table)
+            : parent::compileDelete($query);
     }
 
     /**
-     * Compile a delete statement with joins or limit into SQL.
+     * Compile a delete query that uses joins.
      *
      * @param  \Illuminate\Database\Query\Builder  $query
+     * @param  string  $table
      * @return string
      */
-    protected function compileDeleteWithJoinsOrLimit(Builder $query)
+    protected function compileDeleteWithJoins($query, $table)
     {
-        $table = $this->wrapTable($query->from);
+        $using = ' USING '.collect($query->joins)->map(function ($join) {
+            return $this->wrapTable($join->table);
+        })->implode(', ');
 
-        $alias = last(preg_split('/\s+as\s+/i', $query->from));
+        $where = count($query->wheres) > 0 ? ' '.$this->compileUpdateWheres($query) : '';
 
-        $selectSql = $this->compileSelect($query->select($alias.'.ctid'));
-
-        return "delete from {$table} where {$this->wrap('ctid')} in ({$selectSql})";
+        return trim("delete from {$table}{$using}{$where}");
     }
 
     /**
@@ -318,7 +295,7 @@ class PostgresGrammar extends Grammar
      */
     public function compileTruncate(Builder $query)
     {
-        return ['truncate '.$this->wrapTable($query->from).' restart identity cascade' => []];
+        return ['truncate '.$this->wrapTable($query->from).' restart identity' => []];
     }
 
     /**
@@ -345,33 +322,6 @@ class PostgresGrammar extends Grammar
     }
 
     /**
-     *Wrap the given JSON selector for boolean values.
-     *
-     * @param  string  $value
-     * @return string
-     */
-    protected function wrapJsonBooleanSelector($value)
-    {
-        $selector = str_replace(
-            '->>', '->',
-            $this->wrapJsonSelector($value)
-        );
-
-        return '('.$selector.')::jsonb';
-    }
-
-    /**
-     * Wrap the given JSON boolean value.
-     *
-     * @param  string  $value
-     * @return string
-     */
-    protected function wrapJsonBooleanValue($value)
-    {
-        return "'".$value."'::jsonb";
-    }
-
-    /**
      * Wrap the attributes of the give JSON path.
      *
      * @param  array  $path
@@ -380,9 +330,7 @@ class PostgresGrammar extends Grammar
     protected function wrapJsonPathAttributes($path)
     {
         return array_map(function ($attribute) {
-            return filter_var($attribute, FILTER_VALIDATE_INT) !== false
-                        ? $attribute
-                        : "'$attribute'";
+            return "'$attribute'";
         }, $path);
     }
 }

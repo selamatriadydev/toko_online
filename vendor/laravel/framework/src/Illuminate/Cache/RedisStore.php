@@ -2,10 +2,10 @@
 
 namespace Illuminate\Cache;
 
-use Illuminate\Contracts\Cache\LockProvider;
+use Illuminate\Contracts\Cache\Store;
 use Illuminate\Contracts\Redis\Factory as Redis;
 
-class RedisStore extends TaggableStore implements LockProvider
+class RedisStore extends TaggableStore implements Store
 {
     /**
      * The Redis factory implementation.
@@ -80,58 +80,52 @@ class RedisStore extends TaggableStore implements LockProvider
     }
 
     /**
-     * Store an item in the cache for a given number of seconds.
+     * Store an item in the cache for a given number of minutes.
      *
      * @param  string  $key
-     * @param  mixed  $value
-     * @param  int  $seconds
-     * @return bool
+     * @param  mixed   $value
+     * @param  float|int  $minutes
+     * @return void
      */
-    public function put($key, $value, $seconds)
+    public function put($key, $value, $minutes)
     {
-        return (bool) $this->connection()->setex(
-            $this->prefix.$key, (int) max(1, $seconds), $this->serialize($value)
+        $this->connection()->setex(
+            $this->prefix.$key, (int) max(1, $minutes * 60), $this->serialize($value)
         );
     }
 
     /**
-     * Store multiple items in the cache for a given number of seconds.
+     * Store multiple items in the cache for a given number of minutes.
      *
      * @param  array  $values
-     * @param  int  $seconds
-     * @return bool
+     * @param  float|int  $minutes
+     * @return void
      */
-    public function putMany(array $values, $seconds)
+    public function putMany(array $values, $minutes)
     {
         $this->connection()->multi();
 
-        $manyResult = null;
-
         foreach ($values as $key => $value) {
-            $result = $this->put($key, $value, $seconds);
-
-            $manyResult = is_null($manyResult) ? $result : $result && $manyResult;
+            $this->put($key, $value, $minutes);
         }
 
         $this->connection()->exec();
-
-        return $manyResult ?: false;
     }
 
     /**
      * Store an item in the cache if the key doesn't exist.
      *
      * @param  string  $key
-     * @param  mixed  $value
-     * @param  int  $seconds
+     * @param  mixed   $value
+     * @param  float|int  $minutes
      * @return bool
      */
-    public function add($key, $value, $seconds)
+    public function add($key, $value, $minutes)
     {
         $lua = "return redis.call('exists',KEYS[1])<1 and redis.call('setex',KEYS[1],ARGV[2],ARGV[1])";
 
         return (bool) $this->connection()->eval(
-            $lua, 1, $this->prefix.$key, $this->serialize($value), (int) max(1, $seconds)
+            $lua, 1, $this->prefix.$key, $this->serialize($value), (int) max(1, $minutes * 60)
         );
     }
 
@@ -139,7 +133,7 @@ class RedisStore extends TaggableStore implements LockProvider
      * Increment the value of an item in the cache.
      *
      * @param  string  $key
-     * @param  mixed  $value
+     * @param  mixed   $value
      * @return int
      */
     public function increment($key, $value = 1)
@@ -151,7 +145,7 @@ class RedisStore extends TaggableStore implements LockProvider
      * Decrement the value of an item in the cache.
      *
      * @param  string  $key
-     * @param  mixed  $value
+     * @param  mixed   $value
      * @return int
      */
     public function decrement($key, $value = 1)
@@ -163,12 +157,12 @@ class RedisStore extends TaggableStore implements LockProvider
      * Store an item in the cache indefinitely.
      *
      * @param  string  $key
-     * @param  mixed  $value
-     * @return bool
+     * @param  mixed   $value
+     * @return void
      */
     public function forever($key, $value)
     {
-        return (bool) $this->connection()->set($this->prefix.$key, $this->serialize($value));
+        $this->connection()->set($this->prefix.$key, $this->serialize($value));
     }
 
     /**
@@ -176,24 +170,11 @@ class RedisStore extends TaggableStore implements LockProvider
      *
      * @param  string  $name
      * @param  int  $seconds
-     * @param  string|null  $owner
      * @return \Illuminate\Contracts\Cache\Lock
      */
-    public function lock($name, $seconds = 0, $owner = null)
+    public function lock($name, $seconds = 0)
     {
-        return new RedisLock($this->connection(), $this->prefix.$name, $seconds, $owner);
-    }
-
-    /**
-     * Restore a lock instance using the owner identifier.
-     *
-     * @param  string  $name
-     * @param  string  $owner
-     * @return \Illuminate\Contracts\Cache\Lock
-     */
-    public function restoreLock($name, $owner)
-    {
-        return $this->lock($name, 0, $owner);
+        return new RedisLock($this->connection(), $this->prefix.$name, $seconds);
     }
 
     /**
@@ -235,7 +216,7 @@ class RedisStore extends TaggableStore implements LockProvider
     /**
      * Get the Redis connection instance.
      *
-     * @return \Illuminate\Redis\Connections\Connection
+     * @return \Predis\ClientInterface
      */
     public function connection()
     {
@@ -292,7 +273,7 @@ class RedisStore extends TaggableStore implements LockProvider
      */
     protected function serialize($value)
     {
-        return is_numeric($value) && ! in_array($value, [INF, -INF]) && ! is_nan($value) ? $value : serialize($value);
+        return is_numeric($value) ? $value : serialize($value);
     }
 
     /**

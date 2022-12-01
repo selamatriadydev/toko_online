@@ -2,9 +2,9 @@
 
 namespace Illuminate\Database\Eloquent\Relations;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Model;
 
 abstract class HasOneOrMany extends Relation
 {
@@ -81,9 +81,7 @@ abstract class HasOneOrMany extends Relation
      */
     public function addEagerConstraints(array $models)
     {
-        $whereIn = $this->whereInMethod($this->parent, $this->localKey);
-
-        $this->query->{$whereIn}(
+        $this->query->whereIn(
             $this->foreignKey, $this->getKeys($models, $this->localKey)
         );
     }
@@ -91,7 +89,7 @@ abstract class HasOneOrMany extends Relation
     /**
      * Match the eagerly loaded results to their single parents.
      *
-     * @param  array  $models
+     * @param  array   $models
      * @param  \Illuminate\Database\Eloquent\Collection  $results
      * @param  string  $relation
      * @return array
@@ -104,7 +102,7 @@ abstract class HasOneOrMany extends Relation
     /**
      * Match the eagerly loaded results to their many parents.
      *
-     * @param  array  $models
+     * @param  array   $models
      * @param  \Illuminate\Database\Eloquent\Collection  $results
      * @param  string  $relation
      * @return array
@@ -117,7 +115,7 @@ abstract class HasOneOrMany extends Relation
     /**
      * Match the eagerly loaded results to their many parents.
      *
-     * @param  array  $models
+     * @param  array   $models
      * @param  \Illuminate\Database\Eloquent\Collection  $results
      * @param  string  $relation
      * @param  string  $type
@@ -144,7 +142,7 @@ abstract class HasOneOrMany extends Relation
     /**
      * Get the value of a relationship by one or many type.
      *
-     * @param  array  $dictionary
+     * @param  array   $dictionary
      * @param  string  $key
      * @param  string  $type
      * @return mixed
@@ -153,7 +151,7 @@ abstract class HasOneOrMany extends Relation
     {
         $value = $dictionary[$key];
 
-        return $type === 'one' ? reset($value) : $this->related->newCollection($value);
+        return $type == 'one' ? reset($value) : $this->related->newCollection($value);
     }
 
     /**
@@ -255,8 +253,8 @@ abstract class HasOneOrMany extends Relation
     /**
      * Attach a collection of models to the parent instance.
      *
-     * @param  iterable  $models
-     * @return iterable
+     * @param  \Traversable|array  $models
+     * @return \Traversable|array
      */
     public function saveMany($models)
     {
@@ -285,10 +283,10 @@ abstract class HasOneOrMany extends Relation
     /**
      * Create a Collection of new instances of the related model.
      *
-     * @param  iterable  $records
+     * @param  array  $records
      * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function createMany(iterable $records)
+    public function createMany(array $records)
     {
         $instances = $this->related->newCollection();
 
@@ -308,6 +306,21 @@ abstract class HasOneOrMany extends Relation
     protected function setForeignAttributesForCreate(Model $model)
     {
         $model->setAttribute($this->getForeignKeyName(), $this->getParentKey());
+    }
+
+    /**
+     * Perform an update on all the related models.
+     *
+     * @param  array  $attributes
+     * @return int
+     */
+    public function update(array $attributes)
+    {
+        if ($this->related->usesTimestamps() && ! is_null($this->relatedUpdatedAt())) {
+            $attributes[$this->relatedUpdatedAt()] = $this->related->freshTimestampString();
+        }
+
+        return $this->query->update($attributes);
     }
 
     /**
@@ -406,15 +419,5 @@ abstract class HasOneOrMany extends Relation
     public function getQualifiedForeignKeyName()
     {
         return $this->foreignKey;
-    }
-
-    /**
-     * Get the local key for the relationship.
-     *
-     * @return string
-     */
-    public function getLocalKeyName()
-    {
-        return $this->localKey;
     }
 }

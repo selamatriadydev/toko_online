@@ -3,10 +3,8 @@
 namespace Illuminate\Database\Schema;
 
 use Closure;
-use Doctrine\DBAL\Types\Type;
-use Illuminate\Database\Connection;
 use LogicException;
-use RuntimeException;
+use Illuminate\Database\Connection;
 
 class Builder
 {
@@ -94,7 +92,7 @@ class Builder
      * Determine if the given table has given columns.
      *
      * @param  string  $table
-     * @param  array  $columns
+     * @param  array   $columns
      * @return bool
      */
     public function hasColumns($table, array $columns)
@@ -142,7 +140,7 @@ class Builder
     /**
      * Modify a table on the schema.
      *
-     * @param  string  $table
+     * @param  string    $table
      * @param  \Closure  $callback
      * @return void
      */
@@ -154,7 +152,7 @@ class Builder
     /**
      * Create a new table on the schema.
      *
-     * @param  string  $table
+     * @param  string    $table
      * @param  \Closure  $callback
      * @return void
      */
@@ -218,30 +216,6 @@ class Builder
     }
 
     /**
-     * Drop all types from the database.
-     *
-     * @return void
-     *
-     * @throws \LogicException
-     */
-    public function dropAllTypes()
-    {
-        throw new LogicException('This database driver does not support dropping all types.');
-    }
-
-    /**
-     * Get all of the table names for the database.
-     *
-     * @return void
-     *
-     * @throws \LogicException
-     */
-    public function getAllTables()
-    {
-        throw new LogicException('This database driver does not support getting all tables.');
-    }
-
-    /**
      * Rename a table on the schema.
      *
      * @param  string  $from
@@ -299,44 +273,11 @@ class Builder
      */
     protected function createBlueprint($table, Closure $callback = null)
     {
-        $prefix = $this->connection->getConfig('prefix_indexes')
-                    ? $this->connection->getConfig('prefix')
-                    : '';
-
         if (isset($this->resolver)) {
-            return call_user_func($this->resolver, $table, $callback, $prefix);
+            return call_user_func($this->resolver, $table, $callback);
         }
 
-        return new Blueprint($table, $callback, $prefix);
-    }
-
-    /**
-     * Register a custom Doctrine mapping type.
-     *
-     * @param  string  $class
-     * @param  string  $name
-     * @param  string  $type
-     * @return void
-     *
-     * @throws \Doctrine\DBAL\DBALException
-     * @throws \RuntimeException
-     */
-    public function registerCustomDoctrineType($class, $name, $type)
-    {
-        if (! $this->connection->isDoctrineAvailable()) {
-            throw new RuntimeException(
-                'Registering a custom Doctrine type requires Doctrine DBAL (doctrine/dbal).'
-            );
-        }
-
-        if (! Type::hasType($name)) {
-            Type::addType($name, $class);
-
-            $this->connection
-                ->getDoctrineSchemaManager()
-                ->getDatabasePlatform()
-                ->registerDoctrineTypeMapping($type, $name);
-        }
+        return new Blueprint($table, $callback);
     }
 
     /**

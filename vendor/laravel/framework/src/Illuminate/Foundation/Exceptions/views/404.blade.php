@@ -1,5 +1,5 @@
-@extends('errors::minimal')
+@extends('errors::layout')
 
-@section('title', __('Not Found'))
-@section('code', '404')
-@section('message', __('Not Found'))
+@section('title', 'Page Not Found')
+
+@section('message', 'Sorry, the page you are looking for could not be found.')

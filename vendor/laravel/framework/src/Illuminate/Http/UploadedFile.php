@@ -2,12 +2,11 @@
 
 namespace Illuminate\Http;
 
-use Illuminate\Container\Container;
-use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
-use Illuminate\Contracts\Filesystem\FileNotFoundException;
-use Illuminate\Http\Testing\FileFactory;
 use Illuminate\Support\Arr;
+use Illuminate\Container\Container;
 use Illuminate\Support\Traits\Macroable;
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
+use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
 use Symfony\Component\HttpFoundation\File\UploadedFile as SymfonyUploadedFile;
 
 class UploadedFile extends SymfonyUploadedFile
@@ -21,7 +20,7 @@ class UploadedFile extends SymfonyUploadedFile
      */
     public static function fake()
     {
-        return new FileFactory;
+        return new Testing\FileFactory;
     }
 
     /**
@@ -105,20 +104,10 @@ class UploadedFile extends SymfonyUploadedFile
     }
 
     /**
-     * Get the file's extension supplied by the client.
-     *
-     * @return string
-     */
-    public function clientExtension()
-    {
-        return $this->guessClientExtension();
-    }
-
-    /**
      * Create a new file instance from a base instance.
      *
      * @param  \Symfony\Component\HttpFoundation\File\UploadedFile  $file
-     * @param  bool  $test
+     * @param  bool $test
      * @return static
      */
     public static function createFromBase(SymfonyUploadedFile $file, $test = false)
@@ -127,6 +116,7 @@ class UploadedFile extends SymfonyUploadedFile
             $file->getPathname(),
             $file->getClientOriginalName(),
             $file->getClientMimeType(),
+            $file->getClientSize(),
             $file->getError(),
             $test
         );

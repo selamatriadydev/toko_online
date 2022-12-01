@@ -6,9 +6,7 @@ use Illuminate\Contracts\Cache\Store;
 
 class TaggedCache extends Repository
 {
-    use RetrievesMultipleKeys {
-        putMany as putManyAlias;
-    }
+    use RetrievesMultipleKeys;
 
     /**
      * The tag set instance.
@@ -32,26 +30,10 @@ class TaggedCache extends Repository
     }
 
     /**
-     * Store multiple items in the cache for a given number of seconds.
-     *
-     * @param  array  $values
-     * @param  int|null  $ttl
-     * @return bool
-     */
-    public function putMany(array $values, $ttl = null)
-    {
-        if ($ttl === null) {
-            return $this->putManyForever($values);
-        }
-
-        return $this->putManyAlias($values, $ttl);
-    }
-
-    /**
      * Increment the value of an item in the cache.
      *
      * @param  string  $key
-     * @param  mixed  $value
+     * @param  mixed   $value
      * @return void
      */
     public function increment($key, $value = 1)
@@ -63,7 +45,7 @@ class TaggedCache extends Repository
      * Decrement the value of an item in the cache.
      *
      * @param  string  $key
-     * @param  mixed  $value
+     * @param  mixed   $value
      * @return void
      */
     public function decrement($key, $value = 1)
@@ -74,13 +56,11 @@ class TaggedCache extends Repository
     /**
      * Remove all items from the cache.
      *
-     * @return bool
+     * @return void
      */
     public function flush()
     {
         $this->tags->reset();
-
-        return true;
     }
 
     /**
@@ -111,15 +91,5 @@ class TaggedCache extends Repository
     protected function event($event)
     {
         parent::event($event->setTags($this->tags->getNames()));
-    }
-
-    /**
-     * Get the tag set instance.
-     *
-     * @return \Illuminate\Cache\TagSet
-     */
-    public function getTags()
-    {
-        return $this->tags;
     }
 }

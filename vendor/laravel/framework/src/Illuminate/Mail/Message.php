@@ -2,17 +2,14 @@
 
 namespace Illuminate\Mail;
 
-use Illuminate\Support\Traits\ForwardsCalls;
-use Swift_Attachment;
 use Swift_Image;
+use Swift_Attachment;
 
 /**
  * @mixin \Swift_Message
  */
 class Message
 {
-    use ForwardsCalls;
-
     /**
      * The Swift Message instance.
      *
@@ -324,6 +321,8 @@ class Message
      */
     public function __call($method, $parameters)
     {
-        return $this->forwardCallTo($this->swift, $method, $parameters);
+        $callable = [$this->swift, $method];
+
+        return call_user_func_array($callable, $parameters);
     }
 }

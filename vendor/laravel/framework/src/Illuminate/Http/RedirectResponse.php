@@ -2,19 +2,19 @@
 
 namespace Illuminate\Http;
 
-use Illuminate\Contracts\Support\MessageProvider;
-use Illuminate\Session\Store as SessionStore;
-use Illuminate\Support\MessageBag;
+use BadMethodCallException;
 use Illuminate\Support\Str;
-use Illuminate\Support\Traits\ForwardsCalls;
-use Illuminate\Support\Traits\Macroable;
+use Illuminate\Support\MessageBag;
 use Illuminate\Support\ViewErrorBag;
+use Illuminate\Support\Traits\Macroable;
+use Illuminate\Session\Store as SessionStore;
+use Illuminate\Contracts\Support\MessageProvider;
 use Symfony\Component\HttpFoundation\File\UploadedFile as SymfonyUploadedFile;
 use Symfony\Component\HttpFoundation\RedirectResponse as BaseRedirectResponse;
 
 class RedirectResponse extends BaseRedirectResponse
 {
-    use ForwardsCalls, ResponseTrait, Macroable {
+    use ResponseTrait, Macroable {
         Macroable::__call as macroCall;
     }
 
@@ -37,7 +37,7 @@ class RedirectResponse extends BaseRedirectResponse
      *
      * @param  string|array  $key
      * @param  mixed  $value
-     * @return $this
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function with($key, $value = null)
     {
@@ -68,7 +68,7 @@ class RedirectResponse extends BaseRedirectResponse
     /**
      * Flash an array of input to the session.
      *
-     * @param  array|null  $input
+     * @param  array  $input
      * @return $this
      */
     public function withInput(array $input = null)
@@ -114,7 +114,7 @@ class RedirectResponse extends BaseRedirectResponse
     /**
      * Flash an array of input to the session.
      *
-     * @return $this
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function exceptInput()
     {
@@ -217,7 +217,7 @@ class RedirectResponse extends BaseRedirectResponse
      *
      * @param  string  $method
      * @param  array  $parameters
-     * @return mixed
+     * @return $this
      *
      * @throws \BadMethodCallException
      */
@@ -231,6 +231,8 @@ class RedirectResponse extends BaseRedirectResponse
             return $this->with(Str::snake(substr($method, 4)), $parameters[0]);
         }
 
-        static::throwBadMethodCallException($method);
+        throw new BadMethodCallException(sprintf(
+            'Method %s::%s does not exist.', static::class, $method
+        ));
     }
 }

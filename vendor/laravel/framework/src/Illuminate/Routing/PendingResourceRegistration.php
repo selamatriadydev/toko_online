@@ -2,12 +2,8 @@
 
 namespace Illuminate\Routing;
 
-use Illuminate\Support\Traits\Macroable;
-
 class PendingResourceRegistration
 {
-    use Macroable;
-
     /**
      * The resource registrar.
      *
@@ -141,7 +137,7 @@ class PendingResourceRegistration
     }
 
     /**
-     * Add middleware to the resource routes.
+     * Set a middleware to the resource.
      *
      * @param  mixed  $middleware
      * @return \Illuminate\Routing\PendingResourceRegistration
@@ -149,19 +145,6 @@ class PendingResourceRegistration
     public function middleware($middleware)
     {
         $this->options['middleware'] = $middleware;
-
-        return $this;
-    }
-
-    /**
-     * Indicate that the resource routes should have "shallow" nesting.
-     *
-     * @param  bool  $shallow
-     * @return \Illuminate\Routing\PendingResourceRegistration
-     */
-    public function shallow($shallow = true)
-    {
-        $this->options['shallow'] = $shallow;
 
         return $this;
     }

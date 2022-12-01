@@ -2,21 +2,20 @@
 
 namespace Illuminate\View;
 
+use Exception;
+use Throwable;
 use ArrayAccess;
 use BadMethodCallException;
-use Exception;
-use Illuminate\Contracts\Support\Arrayable;
-use Illuminate\Contracts\Support\Htmlable;
-use Illuminate\Contracts\Support\MessageProvider;
-use Illuminate\Contracts\Support\Renderable;
-use Illuminate\Contracts\View\Engine;
-use Illuminate\Contracts\View\View as ViewContract;
-use Illuminate\Support\MessageBag;
 use Illuminate\Support\Str;
+use Illuminate\Support\MessageBag;
+use Illuminate\Contracts\View\Engine;
 use Illuminate\Support\Traits\Macroable;
-use Throwable;
+use Illuminate\Contracts\Support\Arrayable;
+use Illuminate\Contracts\Support\Renderable;
+use Illuminate\Contracts\Support\MessageProvider;
+use Illuminate\Contracts\View\View as ViewContract;
 
-class View implements ArrayAccess, Htmlable, ViewContract
+class View implements ArrayAccess, ViewContract
 {
     use Macroable {
         __call as macroCall;
@@ -81,7 +80,7 @@ class View implements ArrayAccess, Htmlable, ViewContract
      * Get the string contents of the view.
      *
      * @param  callable|null  $callback
-     * @return array|string
+     * @return string
      *
      * @throws \Throwable
      */
@@ -90,7 +89,7 @@ class View implements ArrayAccess, Htmlable, ViewContract
         try {
             $contents = $this->renderContents();
 
-            $response = isset($callback) ? $callback($this, $contents) : null;
+            $response = isset($callback) ? call_user_func($callback, $this, $contents) : null;
 
             // Once we have the contents of the view, we will flush the sections if we are
             // done rendering all views so that there is nothing left hanging over when
@@ -148,7 +147,7 @@ class View implements ArrayAccess, Htmlable, ViewContract
      *
      * @return array
      */
-    public function gatherData()
+    protected function gatherData()
     {
         $data = array_merge($this->factory->getShared(), $this->data);
 
@@ -164,9 +163,7 @@ class View implements ArrayAccess, Htmlable, ViewContract
     /**
      * Get the sections of the rendered view.
      *
-     * @return array
-     *
-     * @throws \Throwable
+     * @return string
      */
     public function renderSections()
     {
@@ -179,7 +176,7 @@ class View implements ArrayAccess, Htmlable, ViewContract
      * Add a piece of data to the view.
      *
      * @param  string|array  $key
-     * @param  mixed  $value
+     * @param  mixed   $value
      * @return $this
      */
     public function with($key, $value = null)
@@ -198,7 +195,7 @@ class View implements ArrayAccess, Htmlable, ViewContract
      *
      * @param  string  $key
      * @param  string  $view
-     * @param  array  $data
+     * @param  array   $data
      * @return $this
      */
     public function nest($key, $view, array $data = [])
@@ -328,7 +325,7 @@ class View implements ArrayAccess, Htmlable, ViewContract
      * Set a piece of data on the view.
      *
      * @param  string  $key
-     * @param  mixed  $value
+     * @param  mixed   $value
      * @return void
      */
     public function offsetSet($key, $value)
@@ -362,7 +359,7 @@ class View implements ArrayAccess, Htmlable, ViewContract
      * Set a piece of data on the view.
      *
      * @param  string  $key
-     * @param  mixed  $value
+     * @param  mixed   $value
      * @return void
      */
     public function __set($key, $value)
@@ -385,7 +382,7 @@ class View implements ArrayAccess, Htmlable, ViewContract
      * Remove a piece of bound data from the view.
      *
      * @param  string  $key
-     * @return void
+     * @return bool
      */
     public function __unset($key)
     {
@@ -396,7 +393,7 @@ class View implements ArrayAccess, Htmlable, ViewContract
      * Dynamically bind parameters to the view.
      *
      * @param  string  $method
-     * @param  array  $parameters
+     * @param  array   $parameters
      * @return \Illuminate\View\View
      *
      * @throws \BadMethodCallException
@@ -417,21 +414,9 @@ class View implements ArrayAccess, Htmlable, ViewContract
     }
 
     /**
-     * Get content as a string of HTML.
-     *
-     * @return string
-     */
-    public function toHtml()
-    {
-        return $this->render();
-    }
-
-    /**
      * Get the string contents of the view.
      *
      * @return string
-     *
-     * @throws \Throwable
      */
     public function __toString()
     {

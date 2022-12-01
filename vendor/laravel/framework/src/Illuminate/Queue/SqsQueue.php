@@ -3,8 +3,8 @@
 namespace Illuminate\Queue;
 
 use Aws\Sqs\SqsClient;
-use Illuminate\Contracts\Queue\Queue as QueueContract;
 use Illuminate\Queue\Jobs\SqsJob;
+use Illuminate\Contracts\Queue\Queue as QueueContract;
 
 class SqsQueue extends Queue implements QueueContract
 {
@@ -47,7 +47,7 @@ class SqsQueue extends Queue implements QueueContract
     /**
      * Get the size of the queue.
      *
-     * @param  string|null  $queue
+     * @param  string  $queue
      * @return int
      */
     public function size($queue = null)
@@ -66,21 +66,21 @@ class SqsQueue extends Queue implements QueueContract
      * Push a new job onto the queue.
      *
      * @param  string  $job
-     * @param  mixed  $data
-     * @param  string|null  $queue
+     * @param  mixed   $data
+     * @param  string  $queue
      * @return mixed
      */
     public function push($job, $data = '', $queue = null)
     {
-        return $this->pushRaw($this->createPayload($job, $queue ?: $this->default, $data), $queue);
+        return $this->pushRaw($this->createPayload($job, $data), $queue);
     }
 
     /**
      * Push a raw payload onto the queue.
      *
      * @param  string  $payload
-     * @param  string|null  $queue
-     * @param  array  $options
+     * @param  string  $queue
+     * @param  array   $options
      * @return mixed
      */
     public function pushRaw($payload, $queue = null, array $options = [])
@@ -95,15 +95,15 @@ class SqsQueue extends Queue implements QueueContract
      *
      * @param  \DateTimeInterface|\DateInterval|int  $delay
      * @param  string  $job
-     * @param  mixed  $data
-     * @param  string|null  $queue
+     * @param  mixed   $data
+     * @param  string  $queue
      * @return mixed
      */
     public function later($delay, $job, $data = '', $queue = null)
     {
         return $this->sqs->sendMessage([
             'QueueUrl' => $this->getQueue($queue),
-            'MessageBody' => $this->createPayload($job, $queue ?: $this->default, $data),
+            'MessageBody' => $this->createPayload($job, $data),
             'DelaySeconds' => $this->secondsUntil($delay),
         ])->get('MessageId');
     }
@@ -111,7 +111,7 @@ class SqsQueue extends Queue implements QueueContract
     /**
      * Pop the next job off of the queue.
      *
-     * @param  string|null  $queue
+     * @param  string  $queue
      * @return \Illuminate\Contracts\Queue\Job|null
      */
     public function pop($queue = null)

@@ -2,12 +2,11 @@
 
 namespace Illuminate\Queue;
 
-use Illuminate\Contracts\Queue\Queue as QueueContract;
+use Illuminate\Support\Carbon;
 use Illuminate\Database\Connection;
 use Illuminate\Queue\Jobs\DatabaseJob;
 use Illuminate\Queue\Jobs\DatabaseJobRecord;
-use Illuminate\Support\Carbon;
-use PDO;
+use Illuminate\Contracts\Queue\Queue as QueueContract;
 
 class DatabaseQueue extends Queue implements QueueContract
 {
@@ -59,7 +58,7 @@ class DatabaseQueue extends Queue implements QueueContract
     /**
      * Get the size of the queue.
      *
-     * @param  string|null  $queue
+     * @param  string  $queue
      * @return int
      */
     public function size($queue = null)
@@ -73,23 +72,21 @@ class DatabaseQueue extends Queue implements QueueContract
      * Push a new job onto the queue.
      *
      * @param  string  $job
-     * @param  mixed  $data
-     * @param  string|null  $queue
+     * @param  mixed   $data
+     * @param  string  $queue
      * @return mixed
      */
     public function push($job, $data = '', $queue = null)
     {
-        return $this->pushToDatabase($queue, $this->createPayload(
-            $job, $this->getQueue($queue), $data
-        ));
+        return $this->pushToDatabase($queue, $this->createPayload($job, $data));
     }
 
     /**
      * Push a raw payload onto the queue.
      *
      * @param  string  $payload
-     * @param  string|null  $queue
-     * @param  array  $options
+     * @param  string  $queue
+     * @param  array   $options
      * @return mixed
      */
     public function pushRaw($payload, $queue = null, array $options = [])
@@ -102,23 +99,21 @@ class DatabaseQueue extends Queue implements QueueContract
      *
      * @param  \DateTimeInterface|\DateInterval|int  $delay
      * @param  string  $job
-     * @param  mixed  $data
-     * @param  string|null  $queue
+     * @param  mixed   $data
+     * @param  string  $queue
      * @return void
      */
     public function later($delay, $job, $data = '', $queue = null)
     {
-        return $this->pushToDatabase($queue, $this->createPayload(
-            $job, $this->getQueue($queue), $data
-        ), $delay);
+        return $this->pushToDatabase($queue, $this->createPayload($job, $data), $delay);
     }
 
     /**
      * Push an array of jobs onto the queue.
      *
-     * @param  array  $jobs
-     * @param  mixed  $data
-     * @param  string|null  $queue
+     * @param  array   $jobs
+     * @param  mixed   $data
+     * @param  string  $queue
      * @return mixed
      */
     public function bulk($jobs, $data = '', $queue = null)
@@ -129,7 +124,7 @@ class DatabaseQueue extends Queue implements QueueContract
 
         return $this->database->table($this->table)->insert(collect((array) $jobs)->map(
             function ($job) use ($queue, $data, $availableAt) {
-                return $this->buildDatabaseRecord($queue, $this->createPayload($job, $this->getQueue($queue), $data), $availableAt);
+                return $this->buildDatabaseRecord($queue, $this->createPayload($job, $data), $availableAt);
             }
         )->all());
     }
@@ -187,9 +182,8 @@ class DatabaseQueue extends Queue implements QueueContract
     /**
      * Pop the next job off of the queue.
      *
-     * @param  string|null  $queue
+     * @param  string  $queue
      * @return \Illuminate\Contracts\Queue\Job|null
-     *
      * @throws \Exception|\Throwable
      */
     public function pop($queue = null)
@@ -212,7 +206,7 @@ class DatabaseQueue extends Queue implements QueueContract
     protected function getNextAvailableJob($queue)
     {
         $job = $this->database->table($this->table)
-                    ->lock($this->getLockForPopping())
+                    ->lockForUpdate()
                     ->where('queue', $this->getQueue($queue))
                     ->where(function ($query) {
                         $this->isAvailable($query);
@@ -222,24 +216,6 @@ class DatabaseQueue extends Queue implements QueueContract
                     ->first();
 
         return $job ? new DatabaseJobRecord((object) $job) : null;
-    }
-
-    /**
-     * Get the lock required for popping the next job.
-     *
-     * @return string|bool
-     */
-    protected function getLockForPopping()
-    {
-        $databaseEngine = $this->database->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME);
-        $databaseVersion = $this->database->getPdo()->getAttribute(PDO::ATTR_SERVER_VERSION);
-
-        if ($databaseEngine == 'mysql' && ! strpos($databaseVersion, 'MariaDB') && version_compare($databaseVersion, '8.0.1', '>=') ||
-            $databaseEngine == 'pgsql' && version_compare($databaseVersion, '9.5', '>=')) {
-            return 'FOR UPDATE SKIP LOCKED';
-        }
-
-        return true;
     }
 
     /**
@@ -309,7 +285,6 @@ class DatabaseQueue extends Queue implements QueueContract
      * @param  string  $queue
      * @param  string  $id
      * @return void
-     *
      * @throws \Exception|\Throwable
      */
     public function deleteReserved($queue, $id)

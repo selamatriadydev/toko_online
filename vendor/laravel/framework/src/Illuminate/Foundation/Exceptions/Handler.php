@@ -3,39 +3,34 @@
 namespace Illuminate\Foundation\Exceptions;
 
 use Exception;
-use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Auth\AuthenticationException;
-use Illuminate\Contracts\Container\BindingResolutionException;
-use Illuminate\Contracts\Container\Container;
-use Illuminate\Contracts\Debug\ExceptionHandler as ExceptionHandlerContract;
-use Illuminate\Contracts\Support\Responsable;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
+use Throwable;
+use Whoops\Run as Whoops;
+use Illuminate\Support\Arr;
+use Psr\Log\LoggerInterface;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Router;
-use Illuminate\Session\TokenMismatchException;
-use Illuminate\Support\Arr;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\View;
-use Illuminate\Support\Reflector;
 use Illuminate\Support\ViewErrorBag;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\Support\Responsable;
+use Illuminate\Session\TokenMismatchException;
 use Illuminate\Validation\ValidationException;
-use Psr\Log\LoggerInterface;
-use Symfony\Component\Console\Application as ConsoleApplication;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Symfony\Component\Debug\Exception\FlattenException;
-use Symfony\Component\Debug\ExceptionHandler as SymfonyExceptionHandler;
-use Symfony\Component\HttpFoundation\Exception\SuspiciousOperationException;
-use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirectResponse;
-use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
-use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Symfony\Component\Console\Application as ConsoleApplication;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use Throwable;
-use Whoops\Handler\HandlerInterface;
-use Whoops\Run as Whoops;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\Debug\ExceptionHandler as SymfonyExceptionHandler;
+use Illuminate\Contracts\Debug\ExceptionHandler as ExceptionHandlerContract;
+use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirectResponse;
 
 class Handler implements ExceptionHandlerContract
 {
@@ -64,7 +59,6 @@ class Handler implements ExceptionHandlerContract
         HttpException::class,
         HttpResponseException::class,
         ModelNotFoundException::class,
-        SuspiciousOperationException::class,
         TokenMismatchException::class,
         ValidationException::class,
     ];
@@ -94,7 +88,7 @@ class Handler implements ExceptionHandlerContract
      * Report or log an exception.
      *
      * @param  \Exception  $e
-     * @return void
+     * @return mixed
      *
      * @throws \Exception
      */
@@ -104,8 +98,8 @@ class Handler implements ExceptionHandlerContract
             return;
         }
 
-        if (Reflector::isCallable($reportCallable = [$e, 'report'])) {
-            return $this->container->call($reportCallable);
+        if (method_exists($e, 'report')) {
+            return $e->report();
         }
 
         try {
@@ -116,12 +110,8 @@ class Handler implements ExceptionHandlerContract
 
         $logger->error(
             $e->getMessage(),
-            array_merge(
-                $this->exceptionContext($e),
-                $this->context(),
-                ['exception' => $e]
-            )
-        );
+            array_merge($this->context(), ['exception' => $e]
+        ));
     }
 
     /**
@@ -151,17 +141,6 @@ class Handler implements ExceptionHandlerContract
     }
 
     /**
-     * Get the default exception context variables for logging.
-     *
-     * @param  \Exception  $e
-     * @return array
-     */
-    protected function exceptionContext(Exception $e)
-    {
-        return [];
-    }
-
-    /**
      * Get the default context variables for logging.
      *
      * @return array
@@ -171,7 +150,7 @@ class Handler implements ExceptionHandlerContract
         try {
             return array_filter([
                 'userId' => Auth::id(),
-                // 'email' => optional(Auth::user())->email,
+                'email' => Auth::user() ? Auth::user()->email : null,
             ]);
         } catch (Throwable $e) {
             return [];
@@ -179,13 +158,11 @@ class Handler implements ExceptionHandlerContract
     }
 
     /**
-     * Render an exception into an HTTP response.
+     * Render an exception into a response.
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  \Exception  $e
-     * @return \Symfony\Component\HttpFoundation\Response
-     *
-     * @throws \Exception
+     * @return \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\Response
      */
     public function render($request, Exception $e)
     {
@@ -206,8 +183,8 @@ class Handler implements ExceptionHandlerContract
         }
 
         return $request->expectsJson()
-                    ? $this->prepareJsonResponse($request, $e)
-                    : $this->prepareResponse($request, $e);
+                        ? $this->prepareJsonResponse($request, $e)
+                        : $this->prepareResponse($request, $e);
     }
 
     /**
@@ -224,8 +201,6 @@ class Handler implements ExceptionHandlerContract
             $e = new AccessDeniedHttpException($e->getMessage(), $e);
         } elseif ($e instanceof TokenMismatchException) {
             $e = new HttpException(419, $e->getMessage(), $e);
-        } elseif ($e instanceof SuspiciousOperationException) {
-            $e = new NotFoundHttpException('Bad hostname provided.', $e);
         }
 
         return $e;
@@ -236,13 +211,13 @@ class Handler implements ExceptionHandlerContract
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  \Illuminate\Auth\AuthenticationException  $exception
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return \Illuminate\Http\Response
      */
     protected function unauthenticated($request, AuthenticationException $exception)
     {
         return $request->expectsJson()
                     ? response()->json(['message' => $exception->getMessage()], 401)
-                    : redirect()->guest($exception->redirectTo() ?? route('login'));
+                    : redirect()->guest(route('login'));
     }
 
     /**
@@ -273,7 +248,7 @@ class Handler implements ExceptionHandlerContract
     protected function invalid($request, ValidationException $exception)
     {
         return redirect($exception->redirectTo ?? url()->previous())
-                    ->withInput(Arr::except($request->input(), $this->dontFlash))
+                    ->withInput($request->except($this->dontFlash))
                     ->withErrors($exception->errors(), $exception->errorBag);
     }
 
@@ -296,7 +271,7 @@ class Handler implements ExceptionHandlerContract
      * Prepare a response for the given exception.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \Exception  $e
+     * @param  \Exception $e
      * @return \Symfony\Component\HttpFoundation\Response
      */
     protected function prepareResponse($request, Exception $e)
@@ -322,7 +297,7 @@ class Handler implements ExceptionHandlerContract
      */
     protected function convertExceptionToResponse(Exception $e)
     {
-        return new SymfonyResponse(
+        return SymfonyResponse::create(
             $this->renderExceptionContent($e),
             $this->isHttpException($e) ? $e->getStatusCode() : 500,
             $this->isHttpException($e) ? $e->getHeaders() : []
@@ -355,7 +330,7 @@ class Handler implements ExceptionHandlerContract
     protected function renderExceptionWithWhoops(Exception $e)
     {
         return tap(new Whoops, function ($whoops) {
-            $whoops->appendHandler($this->whoopsHandler());
+            $whoops->pushHandler($this->whoopsHandler());
 
             $whoops->writeToOutput(false);
 
@@ -370,11 +345,7 @@ class Handler implements ExceptionHandlerContract
      */
     protected function whoopsHandler()
     {
-        try {
-            return app(HandlerInterface::class);
-        } catch (BindingResolutionException $e) {
-            return (new WhoopsHandler)->forDebug();
-        }
+        return (new WhoopsHandler)->forDebug();
     }
 
     /**
@@ -394,14 +365,14 @@ class Handler implements ExceptionHandlerContract
     /**
      * Render the given HttpException.
      *
-     * @param  \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface  $e
+     * @param  \Symfony\Component\HttpKernel\Exception\HttpException  $e
      * @return \Symfony\Component\HttpFoundation\Response
      */
-    protected function renderHttpException(HttpExceptionInterface $e)
+    protected function renderHttpException(HttpException $e)
     {
         $this->registerErrorViewPaths();
 
-        if (view()->exists($view = $this->getHttpExceptionView($e))) {
+        if (view()->exists($view = "errors::{$e->getStatusCode()}")) {
             return response()->view($view, [
                 'errors' => new ViewErrorBag,
                 'exception' => $e,
@@ -423,17 +394,6 @@ class Handler implements ExceptionHandlerContract
         View::replaceNamespace('errors', $paths->map(function ($path) {
             return "{$path}/errors";
         })->push(__DIR__.'/views')->all());
-    }
-
-    /**
-     * Get the view used to render HTTP exceptions.
-     *
-     * @param  \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface  $e
-     * @return string
-     */
-    protected function getHttpExceptionView(HttpExceptionInterface $e)
-    {
-        return "errors::{$e->getStatusCode()}";
     }
 
     /**
@@ -462,7 +422,7 @@ class Handler implements ExceptionHandlerContract
      * Prepare a JSON response for the given exception.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \Exception  $e
+     * @param  \Exception $e
      * @return \Illuminate\Http\JsonResponse
      */
     protected function prepareJsonResponse($request, Exception $e)
@@ -516,6 +476,6 @@ class Handler implements ExceptionHandlerContract
      */
     protected function isHttpException(Exception $e)
     {
-        return $e instanceof HttpExceptionInterface;
+        return $e instanceof HttpException;
     }
 }

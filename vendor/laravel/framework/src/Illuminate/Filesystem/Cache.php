@@ -22,25 +22,27 @@ class Cache extends AbstractCache
     protected $key;
 
     /**
-     * The cache expiration time in seconds.
+     * The cache expiration time in minutes.
      *
-     * @var int|null
+     * @var int
      */
     protected $expire;
 
     /**
      * Create a new cache instance.
      *
-     * @param  \Illuminate\Contracts\Cache\Repository  $repository
-     * @param  string  $key
-     * @param  int|null  $expire
-     * @return void
+     * @param \Illuminate\Contracts\Cache\Repository  $repository
+     * @param string  $key
+     * @param int|null  $expire
      */
     public function __construct(Repository $repository, $key = 'flysystem', $expire = null)
     {
         $this->key = $key;
-        $this->expire = $expire;
         $this->repository = $repository;
+
+        if (! is_null($expire)) {
+            $this->expire = (int) ceil($expire / 60);
+        }
     }
 
     /**
@@ -66,6 +68,10 @@ class Cache extends AbstractCache
     {
         $contents = $this->getForStorage();
 
-        $this->repository->put($this->key, $contents, $this->expire);
+        if (! is_null($this->expire)) {
+            $this->repository->put($this->key, $contents, $this->expire);
+        } else {
+            $this->repository->forever($this->key, $contents);
+        }
     }
 }

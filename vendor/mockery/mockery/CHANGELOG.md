@@ -1,5 +1,13 @@
 # Change Log
 
+## 1.3.6 (2022-09-07)
+* PHP 8.2 | Fix "Use of "parent" in callables is deprecated" notice #1169
+
+## 1.3.5 (2021-09-13)
+* Fix auto-generated return values with union types #1143
+* Adds support for tentative types #1130
+* Fixes for PHP 8.1 Support (#1130 and #1140)
+
 ## 1.3.4 (2021-02-24)
 
 * Fixes calls to fetchMock before initialisation #1113

@@ -30,7 +30,7 @@ class PostgresBuilder extends Builder
     {
         $tables = [];
 
-        $excludedTables = $this->connection->getConfig('dont_drop') ?? ['spatial_ref_sys'];
+        $excludedTables = ['spatial_ref_sys'];
 
         foreach ($this->getAllTables() as $row) {
             $row = (array) $row;
@@ -76,38 +76,14 @@ class PostgresBuilder extends Builder
     }
 
     /**
-     * Drop all types from the database.
-     *
-     * @return void
-     */
-    public function dropAllTypes()
-    {
-        $types = [];
-
-        foreach ($this->getAllTypes() as $row) {
-            $row = (array) $row;
-
-            $types[] = reset($row);
-        }
-
-        if (empty($types)) {
-            return;
-        }
-
-        $this->connection->statement(
-            $this->grammar->compileDropAllTypes($types)
-        );
-    }
-
-    /**
      * Get all of the table names for the database.
      *
      * @return array
      */
-    public function getAllTables()
+    protected function getAllTables()
     {
         return $this->connection->select(
-            $this->grammar->compileGetAllTables((array) $this->connection->getConfig('schema'))
+            $this->grammar->compileGetAllTables($this->connection->getConfig('schema'))
         );
     }
 
@@ -116,22 +92,10 @@ class PostgresBuilder extends Builder
      *
      * @return array
      */
-    public function getAllViews()
+    protected function getAllViews()
     {
         return $this->connection->select(
-            $this->grammar->compileGetAllViews((array) $this->connection->getConfig('schema'))
-        );
-    }
-
-    /**
-     * Get all of the type names for the database.
-     *
-     * @return array
-     */
-    public function getAllTypes()
-    {
-        return $this->connection->select(
-            $this->grammar->compileGetAllTypes()
+            $this->grammar->compileGetAllViews($this->connection->getConfig('schema'))
         );
     }
 

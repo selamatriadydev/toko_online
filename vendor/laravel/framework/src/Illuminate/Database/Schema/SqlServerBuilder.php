@@ -11,18 +11,10 @@ class SqlServerBuilder extends Builder
      */
     public function dropAllTables()
     {
-        $this->connection->statement($this->grammar->compileDropAllForeignKeys());
+        $this->disableForeignKeyConstraints();
 
         $this->connection->statement($this->grammar->compileDropAllTables());
-    }
 
-    /**
-     * Drop all views from the database.
-     *
-     * @return void
-     */
-    public function dropAllViews()
-    {
-        $this->connection->statement($this->grammar->compileDropAllViews());
+        $this->enableForeignKeyConstraints();
     }
 }

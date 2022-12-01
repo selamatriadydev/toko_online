@@ -16,6 +16,8 @@ trait ConditionallyLoadsAttributes
     {
         $index = -1;
 
+        $numericKeys = array_values($data) === $data;
+
         foreach ($data as $key => $value) {
             $index++;
 
@@ -26,10 +28,7 @@ trait ConditionallyLoadsAttributes
             }
 
             if (is_numeric($key) && $value instanceof MergeValue) {
-                return $this->mergeData(
-                    $data, $index, $this->filter($value->data),
-                    array_values($value->data) === $value->data
-                );
+                return $this->mergeData($data, $index, $this->filter($value->data), $numericKeys);
             }
 
             if ($value instanceof self && is_null($value->resource)) {
@@ -37,7 +36,7 @@ trait ConditionallyLoadsAttributes
             }
         }
 
-        return $this->removeMissingValues($data);
+        return $this->removeMissingValues($data, $numericKeys);
     }
 
     /**
@@ -55,7 +54,7 @@ trait ConditionallyLoadsAttributes
             return $this->removeMissingValues(array_merge(
                 array_merge(array_slice($data, 0, $index, true), $merge),
                 $this->filter(array_values(array_slice($data, $index + 1, null, true)))
-            ));
+            ), $numericKeys);
         }
 
         return $this->removeMissingValues(array_slice($data, 0, $index, true) +
@@ -67,28 +66,22 @@ trait ConditionallyLoadsAttributes
      * Remove the missing values from the filtered data.
      *
      * @param  array  $data
+     * @param  bool  $numericKeys
      * @return array
      */
-    protected function removeMissingValues($data)
+    protected function removeMissingValues($data, $numericKeys = false)
     {
-        $numericKeys = true;
-
         foreach ($data as $key => $value) {
             if (($value instanceof PotentiallyMissing && $value->isMissing()) ||
                 ($value instanceof self &&
                 $value->resource instanceof PotentiallyMissing &&
                 $value->isMissing())) {
                 unset($data[$key]);
-            } else {
-                $numericKeys = $numericKeys && is_numeric($key);
             }
         }
 
-        if (property_exists($this, 'preserveKeys') && $this->preserveKeys === true) {
-            return $data;
-        }
-
-        return $numericKeys ? array_values($data) : $data;
+        return ! empty($data) && is_numeric(array_keys($data)[0])
+                        ? array_values($data) : $data;
     }
 
     /**
@@ -183,28 +176,14 @@ trait ConditionallyLoadsAttributes
      */
     protected function whenPivotLoaded($table, $value, $default = null)
     {
-        return $this->whenPivotLoadedAs('pivot', ...func_get_args());
-    }
-
-    /**
-     * Execute a callback if the given pivot table with a custom accessor has been loaded.
-     *
-     * @param  string  $accessor
-     * @param  string  $table
-     * @param  mixed  $value
-     * @param  mixed  $default
-     * @return \Illuminate\Http\Resources\MissingValue|mixed
-     */
-    protected function whenPivotLoadedAs($accessor, $table, $value, $default = null)
-    {
-        if (func_num_args() === 3) {
+        if (func_num_args() === 2) {
             $default = new MissingValue;
         }
 
         return $this->when(
-            $this->resource->$accessor &&
-            ($this->resource->$accessor instanceof $table ||
-            $this->resource->$accessor->getTable() === $table),
+            $this->resource->pivot &&
+            ($this->resource->pivot instanceof $table ||
+             $this->resource->pivot->getTable() === $table),
             ...[$value, $default]
         );
     }

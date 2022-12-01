@@ -1,3 +1,28 @@
+1.16.0 / 2022/11/29
+===================
+
+* [added] Allow install with PHP 8.2 [@gquemener]
+* [added] Use shorter object IDs for object comparison [@TysonAndre]
+* [added] Support standalone false,true and null types [@kschatzle]
+* [added] Support doubling readonly classes [@gquemener]
+* [fixed] Remove workarounds for unsupported HHVM [@TysonAndre]
+* [fixed] Clear error message when doubling DNF types [@kschatzle]
+
+
+1.15.0 / 2021/12/08
+===================
+
+* [added] Support for the `static` return type [@denis-rolling-scopes]
+* [fixed] Add return types for Comparator implementations to avoid deprecation warnings from Symfony's DebugClassLoader [@stof]
+
+1.14.0 / 2021/09/16
+===================
+
+* [added] Support for static closures in will and should [@ntzm]
+* [added] Allow install on PHP 8.1 (with test suite fixes) [@javer]
+* [added] Support for the 'never' return type [@ciaranmcnulty]
+* [fixed] Better error message when doubling intersection return types [@ciaranmcnulty]
+
 1.13.0 / 2021/03/17
 ===================
 

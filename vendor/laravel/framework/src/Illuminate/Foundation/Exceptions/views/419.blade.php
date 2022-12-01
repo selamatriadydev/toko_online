@@ -1,5 +1,9 @@
-@extends('errors::minimal')
+@extends('errors::layout')
 
-@section('title', __('Page Expired'))
-@section('code', '419')
-@section('message', __('Page Expired'))
+@section('title', 'Page Expired')
+
+@section('message')
+    The page has expired due to inactivity.
+    <br/><br/>
+    Please refresh and try again.
+@stop

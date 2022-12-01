@@ -3,13 +3,12 @@
 namespace Illuminate\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Contracts\Queue\ShouldQueue;
 
 class SendQueuedNotifications implements ShouldQueue
 {
-    use InteractsWithQueue, Queueable, SerializesModels;
+    use Queueable, SerializesModels;
 
     /**
      * The notifiable entities that should receive the notification.
@@ -33,25 +32,11 @@ class SendQueuedNotifications implements ShouldQueue
     public $channels;
 
     /**
-     * The number of times the job may be attempted.
-     *
-     * @var int
-     */
-    public $tries;
-
-    /**
-     * The number of seconds the job can run before timing out.
-     *
-     * @var int
-     */
-    public $timeout;
-
-    /**
      * Create a new job instance.
      *
      * @param  \Illuminate\Support\Collection  $notifiables
      * @param  \Illuminate\Notifications\Notification  $notification
-     * @param  array|null  $channels
+     * @param  array  $channels
      * @return void
      */
     public function __construct($notifiables, $notification, array $channels = null)
@@ -59,8 +44,6 @@ class SendQueuedNotifications implements ShouldQueue
         $this->channels = $channels;
         $this->notifiables = $notifiables;
         $this->notification = $notification;
-        $this->tries = property_exists($notification, 'tries') ? $notification->tries : null;
-        $this->timeout = property_exists($notification, 'timeout') ? $notification->timeout : null;
     }
 
     /**
@@ -95,34 +78,6 @@ class SendQueuedNotifications implements ShouldQueue
         if (method_exists($this->notification, 'failed')) {
             $this->notification->failed($e);
         }
-    }
-
-    /**
-     * Get the retry delay for the notification.
-     *
-     * @return mixed
-     */
-    public function retryAfter()
-    {
-        if (! method_exists($this->notification, 'retryAfter') && ! isset($this->notification->retryAfter)) {
-            return;
-        }
-
-        return $this->notification->retryAfter ?? $this->notification->retryAfter();
-    }
-
-    /**
-     * Get the expiration for the notification.
-     *
-     * @return mixed
-     */
-    public function retryUntil()
-    {
-        if (! method_exists($this->notification, 'retryUntil') && ! isset($this->notification->timeoutAt)) {
-            return;
-        }
-
-        return $this->notification->timeoutAt ?? $this->notification->retryUntil();
     }
 
     /**

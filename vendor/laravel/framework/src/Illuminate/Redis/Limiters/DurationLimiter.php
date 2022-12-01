@@ -51,10 +51,10 @@ class DurationLimiter
     /**
      * Create a new duration limiter instance.
      *
-     * @param  \Illuminate\Redis\Connections\Connection  $redis
-     * @param  string  $name
-     * @param  int  $maxLocks
-     * @param  int  $decay
+     * @param  \Illuminate\Redis\Connections\Connection $redis
+     * @param  string $name
+     * @param  int $maxLocks
+     * @param  int $decay
      * @return void
      */
     public function __construct($redis, $name, $maxLocks, $decay)
@@ -68,10 +68,9 @@ class DurationLimiter
     /**
      * Attempt to acquire the lock for the given number of seconds.
      *
-     * @param  int  $timeout
-     * @param  callable|null  $callback
-     * @return mixed
-     *
+     * @param  int $timeout
+     * @param  callable|null $callback
+     * @return bool
      * @throws \Illuminate\Contracts\Redis\LimiterTimeoutException
      */
     public function block($timeout, $callback = null)
@@ -87,7 +86,7 @@ class DurationLimiter
         }
 
         if (is_callable($callback)) {
-            return $callback();
+            $callback();
         }
 
         return true;
@@ -100,8 +99,8 @@ class DurationLimiter
      */
     public function acquire()
     {
-        $results = $this->redis->eval(
-            $this->luaScript(), 1, $this->name, microtime(true), time(), $this->decay, $this->maxLocks
+        $results = $this->redis->eval($this->luaScript(), 1,
+            $this->name, microtime(true), time(), $this->decay, $this->maxLocks
         );
 
         $this->decaysAt = $results[1];

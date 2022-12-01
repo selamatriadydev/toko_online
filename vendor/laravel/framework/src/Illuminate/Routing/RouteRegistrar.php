@@ -2,10 +2,9 @@
 
 namespace Illuminate\Routing;
 
-use BadMethodCallException;
 use Closure;
+use BadMethodCallException;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Reflector;
 use InvalidArgumentException;
 
 /**
@@ -168,15 +167,6 @@ class RouteRegistrar
             $action = ['uses' => $action];
         }
 
-        if (is_array($action) &&
-            ! Arr::isAssoc($action) &&
-            Reflector::isCallable($action)) {
-            $action = [
-                'uses' => $action[0].'@'.$action[1],
-                'controller' => $action[0].'@'.$action[1],
-            ];
-        }
-
         return array_merge($this->attributes, $action);
     }
 
@@ -196,7 +186,7 @@ class RouteRegistrar
         }
 
         if (in_array($method, $this->allowedAttributes)) {
-            if ($method === 'middleware') {
+            if ($method == 'middleware') {
                 return $this->attribute($method, is_array($parameters[0]) ? $parameters[0] : $parameters);
             }
 

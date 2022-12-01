@@ -3,8 +3,8 @@
 namespace Illuminate\Routing;
 
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Session\Store as SessionStore;
 use Illuminate\Support\Traits\Macroable;
+use Illuminate\Session\Store as SessionStore;
 
 class Redirector
 {
@@ -49,7 +49,7 @@ class Redirector
     /**
      * Create a new redirect response to the previous location.
      *
-     * @param  int  $status
+     * @param  int    $status
      * @param  array  $headers
      * @param  mixed  $fallback
      * @return \Illuminate\Http\RedirectResponse
@@ -62,7 +62,7 @@ class Redirector
     /**
      * Create a new redirect response to the current URI.
      *
-     * @param  int  $status
+     * @param  int    $status
      * @param  array  $headers
      * @return \Illuminate\Http\RedirectResponse
      */
@@ -75,22 +75,14 @@ class Redirector
      * Create a new redirect response, while putting the current URL in the session.
      *
      * @param  string  $path
-     * @param  int  $status
-     * @param  array  $headers
-     * @param  bool|null  $secure
+     * @param  int     $status
+     * @param  array   $headers
+     * @param  bool    $secure
      * @return \Illuminate\Http\RedirectResponse
      */
     public function guest($path, $status = 302, $headers = [], $secure = null)
     {
-        $request = $this->generator->getRequest();
-
-        $intended = $request->method() === 'GET' && $request->route() && ! $request->expectsJson()
-                        ? $this->generator->full()
-                        : $this->generator->previous();
-
-        if ($intended) {
-            $this->setIntendedUrl($intended);
-        }
+        $this->session->put('url.intended', $this->generator->full());
 
         return $this->to($path, $status, $headers, $secure);
     }
@@ -99,9 +91,9 @@ class Redirector
      * Create a new redirect response to the previously intended location.
      *
      * @param  string  $default
-     * @param  int  $status
-     * @param  array  $headers
-     * @param  bool|null  $secure
+     * @param  int     $status
+     * @param  array   $headers
+     * @param  bool    $secure
      * @return \Illuminate\Http\RedirectResponse
      */
     public function intended($default = '/', $status = 302, $headers = [], $secure = null)
@@ -112,23 +104,12 @@ class Redirector
     }
 
     /**
-     * Set the intended url.
-     *
-     * @param  string  $url
-     * @return void
-     */
-    public function setIntendedUrl($url)
-    {
-        $this->session->put('url.intended', $url);
-    }
-
-    /**
      * Create a new redirect response to the given path.
      *
      * @param  string  $path
-     * @param  int  $status
-     * @param  array  $headers
-     * @param  bool|null  $secure
+     * @param  int     $status
+     * @param  array   $headers
+     * @param  bool    $secure
      * @return \Illuminate\Http\RedirectResponse
      */
     public function to($path, $status = 302, $headers = [], $secure = null)
@@ -140,8 +121,8 @@ class Redirector
      * Create a new redirect response to an external URL (no validation).
      *
      * @param  string  $path
-     * @param  int  $status
-     * @param  array  $headers
+     * @param  int     $status
+     * @param  array   $headers
      * @return \Illuminate\Http\RedirectResponse
      */
     public function away($path, $status = 302, $headers = [])
@@ -153,8 +134,8 @@ class Redirector
      * Create a new redirect response to the given HTTPS path.
      *
      * @param  string  $path
-     * @param  int  $status
-     * @param  array  $headers
+     * @param  int     $status
+     * @param  array   $headers
      * @return \Illuminate\Http\RedirectResponse
      */
     public function secure($path, $status = 302, $headers = [])
@@ -166,9 +147,9 @@ class Redirector
      * Create a new redirect response to a named route.
      *
      * @param  string  $route
-     * @param  mixed  $parameters
-     * @param  int  $status
-     * @param  array  $headers
+     * @param  mixed   $parameters
+     * @param  int     $status
+     * @param  array   $headers
      * @return \Illuminate\Http\RedirectResponse
      */
     public function route($route, $parameters = [], $status = 302, $headers = [])
@@ -179,10 +160,10 @@ class Redirector
     /**
      * Create a new redirect response to a controller action.
      *
-     * @param  string|array  $action
-     * @param  mixed  $parameters
-     * @param  int  $status
-     * @param  array  $headers
+     * @param  string  $action
+     * @param  mixed   $parameters
+     * @param  int     $status
+     * @param  array   $headers
      * @return \Illuminate\Http\RedirectResponse
      */
     public function action($action, $parameters = [], $status = 302, $headers = [])
@@ -194,8 +175,8 @@ class Redirector
      * Create a new redirect response.
      *
      * @param  string  $path
-     * @param  int  $status
-     * @param  array  $headers
+     * @param  int     $status
+     * @param  array   $headers
      * @return \Illuminate\Http\RedirectResponse
      */
     protected function createRedirect($path, $status, $headers)

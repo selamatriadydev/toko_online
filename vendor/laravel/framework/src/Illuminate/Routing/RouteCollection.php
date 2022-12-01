@@ -2,14 +2,14 @@
 
 namespace Illuminate\Routing;
 
-use ArrayIterator;
 use Countable;
+use ArrayIterator;
+use IteratorAggregate;
+use Illuminate\Support\Arr;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Arr;
-use IteratorAggregate;
-use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
 class RouteCollection implements Countable, IteratorAggregate
 {
@@ -21,7 +21,7 @@ class RouteCollection implements Countable, IteratorAggregate
     protected $routes = [];
 
     /**
-     * A flattened array of all of the routes.
+     * An flattened array of all of the routes.
      *
      * @var array
      */
@@ -84,15 +84,15 @@ class RouteCollection implements Countable, IteratorAggregate
         // If the route has a name, we will add it to the name look-up table so that we
         // will quickly be able to find any route associate with a name and not have
         // to iterate through every route every time we need to perform a look-up.
-        if ($name = $route->getName()) {
-            $this->nameList[$name] = $route;
+        $action = $route->getAction();
+
+        if (isset($action['as'])) {
+            $this->nameList[$action['as']] = $route;
         }
 
         // When the route is routing to a controller we will also store the action that
         // is used by the route. This will let us reverse route to controllers while
         // processing a request and easily generate URLs to the given controllers.
-        $action = $route->getAction();
-
         if (isset($action['controller'])) {
             $this->addToActionList($action, $route);
         }
@@ -233,34 +233,26 @@ class RouteCollection implements Countable, IteratorAggregate
      */
     protected function getRouteForMethods($request, array $methods)
     {
-        if ($request->method() === 'OPTIONS') {
+        if ($request->method() == 'OPTIONS') {
             return (new Route('OPTIONS', $request->path(), function () use ($methods) {
                 return new Response('', 200, ['Allow' => implode(',', $methods)]);
             }))->bind($request);
         }
 
-        $this->methodNotAllowed($methods, $request->method());
+        $this->methodNotAllowed($methods);
     }
 
     /**
      * Throw a method not allowed HTTP exception.
      *
      * @param  array  $others
-     * @param  string  $method
      * @return void
      *
      * @throws \Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException
      */
-    protected function methodNotAllowed(array $others, $method)
+    protected function methodNotAllowed(array $others)
     {
-        throw new MethodNotAllowedHttpException(
-            $others,
-            sprintf(
-                'The %s method is not supported for this route. Supported methods: %s.',
-                $method,
-                implode(', ', $others)
-            )
-        );
+        throw new MethodNotAllowedHttpException($others);
     }
 
     /**

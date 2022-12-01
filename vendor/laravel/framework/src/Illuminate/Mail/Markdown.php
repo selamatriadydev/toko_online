@@ -2,12 +2,9 @@
 
 namespace Illuminate\Mail;
 
-use Illuminate\Contracts\View\Factory as ViewFactory;
+use Parsedown;
 use Illuminate\Support\HtmlString;
-use Illuminate\Support\Str;
-use League\CommonMark\CommonMarkConverter;
-use League\CommonMark\Environment;
-use League\CommonMark\Extension\Table\TableExtension;
+use Illuminate\Contracts\View\Factory as ViewFactory;
 use TijsVerkoyen\CssToInlineStyles\CssToInlineStyles;
 
 class Markdown
@@ -63,17 +60,13 @@ class Markdown
             'mail', $this->htmlComponentPaths()
         )->make($view, $data)->render();
 
-        $theme = Str::contains($this->theme, '::')
-            ? $this->theme
-            : 'mail::themes.'.$this->theme;
-
         return new HtmlString(($inliner ?: new CssToInlineStyles)->convert(
-            $contents, $this->view->make($theme, $data)->render()
+            $contents, $this->view->make('mail::themes.'.$this->theme)->render()
         ));
     }
 
     /**
-     * Render the Markdown template into text.
+     * Render the Markdown template into HTML.
      *
      * @param  string  $view
      * @param  array  $data
@@ -84,7 +77,7 @@ class Markdown
         $this->view->flushFinderCache();
 
         $contents = $this->view->replaceNamespace(
-            'mail', $this->textComponentPaths()
+            'mail', $this->markdownComponentPaths()
         )->make($view, $data)->render();
 
         return new HtmlString(
@@ -100,15 +93,9 @@ class Markdown
      */
     public static function parse($text)
     {
-        $environment = Environment::createCommonMarkEnvironment();
+        $parsedown = new Parsedown;
 
-        $environment->addExtension(new TableExtension);
-
-        $converter = new CommonMarkConverter([
-            'allow_unsafe_links' => false,
-        ], $environment);
-
-        return new HtmlString($converter->convertToHtml($text));
+        return new HtmlString($parsedown->text($text));
     }
 
     /**
@@ -124,14 +111,14 @@ class Markdown
     }
 
     /**
-     * Get the text component paths.
+     * Get the Markdown component paths.
      *
      * @return array
      */
-    public function textComponentPaths()
+    public function markdownComponentPaths()
     {
         return array_map(function ($path) {
-            return $path.'/text';
+            return $path.'/markdown';
         }, $this->componentPaths());
     }
 

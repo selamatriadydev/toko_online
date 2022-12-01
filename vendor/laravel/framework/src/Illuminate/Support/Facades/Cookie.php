@@ -25,9 +25,9 @@ class Cookie extends Facade
     /**
      * Retrieve a cookie from the request.
      *
-     * @param  string|null  $key
-     * @param  mixed  $default
-     * @return string|array|null
+     * @param  string  $key
+     * @param  mixed   $default
+     * @return string
      */
     public static function get($key = null, $default = null)
     {

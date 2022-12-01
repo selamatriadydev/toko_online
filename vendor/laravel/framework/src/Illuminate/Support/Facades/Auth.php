@@ -3,7 +3,7 @@
 namespace Illuminate\Support\Facades;
 
 /**
- * @method static \Illuminate\Contracts\Auth\Guard|\Illuminate\Contracts\Auth\StatefulGuard guard(string|null $name = null)
+ * @method static mixed guard(string|null $name = null)
  * @method static void shouldUse(string $name);
  * @method static bool check()
  * @method static bool guest()
@@ -19,7 +19,7 @@ namespace Illuminate\Support\Facades;
  * @method static bool viaRemember()
  * @method static void logout()
  * @method static \Symfony\Component\HttpFoundation\Response|null onceBasic(string $field = 'email',array $extraConditions = [])
- * @method static bool|null logoutOtherDevices(string $password, string $attribute = 'password')
+ * @method static null|bool logoutOtherDevices(string $password, string $attribute = 'password')
  * @method static \Illuminate\Contracts\Auth\UserProvider|null createUserProvider(string $provider = null)
  * @method static \Illuminate\Auth\AuthManager extend(string $driver, \Closure $callback)
  * @method static \Illuminate\Auth\AuthManager provider(string $name, \Closure $callback)
@@ -44,11 +44,10 @@ class Auth extends Facade
     /**
      * Register the typical authentication routes for an application.
      *
-     * @param  array  $options
      * @return void
      */
-    public static function routes(array $options = [])
+    public static function routes()
     {
-        static::$app->make('router')->auth($options);
+        static::$app->make('router')->auth();
     }
 }

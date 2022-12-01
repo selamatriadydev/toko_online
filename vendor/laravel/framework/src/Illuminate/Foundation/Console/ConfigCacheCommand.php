@@ -2,11 +2,11 @@
 
 namespace Illuminate\Foundation\Console;
 
-use Illuminate\Console\Command;
-use Illuminate\Contracts\Console\Kernel as ConsoleKernelContract;
-use Illuminate\Filesystem\Filesystem;
-use LogicException;
 use Throwable;
+use LogicException;
+use Illuminate\Console\Command;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Contracts\Console\Kernel as ConsoleKernelContract;
 
 class ConfigCacheCommand extends Command
 {
@@ -48,15 +48,12 @@ class ConfigCacheCommand extends Command
      * Execute the console command.
      *
      * @return void
-     *
-     * @throws \LogicException
      */
     public function handle()
     {
         $this->call('config:clear');
 
         $config = $this->getFreshConfiguration();
-
         $configPath = $this->laravel->getCachedConfigPath();
 
         $this->files->put(
@@ -82,8 +79,6 @@ class ConfigCacheCommand extends Command
     protected function getFreshConfiguration()
     {
         $app = require $this->laravel->bootstrapPath().'/app.php';
-
-        $app->useStoragePath($this->laravel->storagePath());
 
         $app->make(ConsoleKernelContract::class)->bootstrap();
 

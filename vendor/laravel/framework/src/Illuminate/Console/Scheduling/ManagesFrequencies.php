@@ -52,22 +52,12 @@ trait ManagesFrequencies
      */
     private function inTimeInterval($startTime, $endTime)
     {
-        [$now, $startTime, $endTime] = [
-            Carbon::now($this->timezone),
-            Carbon::parse($startTime, $this->timezone),
-            Carbon::parse($endTime, $this->timezone),
-        ];
-
-        if ($endTime->lessThan($startTime)) {
-            if ($startTime->greaterThan($now)) {
-                $startTime->subDay(1);
-            } else {
-                $endTime->addDay(1);
-            }
-        }
-
-        return function () use ($now, $startTime, $endTime) {
-            return $now->between($startTime, $endTime);
+        return function () use ($startTime, $endTime) {
+            return Carbon::now($this->timezone)->between(
+                Carbon::parse($startTime, $this->timezone),
+                Carbon::parse($endTime, $this->timezone),
+                true
+            );
         };
     }
 
@@ -134,13 +124,11 @@ trait ManagesFrequencies
     /**
      * Schedule the event to run hourly at a given offset in the hour.
      *
-     * @param  array|int  $offset
+     * @param  int  $offset
      * @return $this
      */
     public function hourlyAt($offset)
     {
-        $offset = is_array($offset) ? implode(',', $offset) : $offset;
-
         return $this->spliceIntoPosition(1, $offset);
     }
 
@@ -177,7 +165,7 @@ trait ManagesFrequencies
         $segments = explode(':', $time);
 
         return $this->spliceIntoPosition(2, (int) $segments[0])
-                    ->spliceIntoPosition(1, count($segments) === 2 ? (int) $segments[1] : '0');
+                    ->spliceIntoPosition(1, count($segments) == 2 ? (int) $segments[1] : '0');
     }
 
     /**

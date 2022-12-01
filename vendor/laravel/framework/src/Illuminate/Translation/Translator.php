@@ -3,14 +3,13 @@
 namespace Illuminate\Translation;
 
 use Countable;
-use Illuminate\Contracts\Translation\Loader;
-use Illuminate\Contracts\Translation\Translator as TranslatorContract;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Collection;
-use Illuminate\Support\NamespacedItemResolver;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Traits\Macroable;
-use InvalidArgumentException;
+use Illuminate\Contracts\Translation\Loader;
+use Illuminate\Support\NamespacedItemResolver;
+use Illuminate\Contracts\Translation\Translator as TranslatorContract;
 
 class Translator extends NamespacedItemResolver implements TranslatorContract
 {
@@ -61,8 +60,7 @@ class Translator extends NamespacedItemResolver implements TranslatorContract
     public function __construct(Loader $loader, $locale)
     {
         $this->loader = $loader;
-
-        $this->setLocale($locale);
+        $this->locale = $locale;
     }
 
     /**
@@ -91,15 +89,64 @@ class Translator extends NamespacedItemResolver implements TranslatorContract
     }
 
     /**
+     * Get the translation for a given key.
+     *
+     * @param  string  $key
+     * @param  array   $replace
+     * @param  string  $locale
+     * @return string|array|null
+     */
+    public function trans($key, array $replace = [], $locale = null)
+    {
+        return $this->get($key, $replace, $locale);
+    }
+
+    /**
      * Get the translation for the given key.
      *
      * @param  string  $key
-     * @param  array  $replace
+     * @param  array   $replace
      * @param  string|null  $locale
      * @param  bool  $fallback
-     * @return string|array
+     * @return string|array|null
      */
     public function get($key, array $replace = [], $locale = null, $fallback = true)
+    {
+        [$namespace, $group, $item] = $this->parseKey($key);
+
+        // Here we will get the locale that should be used for the language line. If one
+        // was not passed, we will use the default locales which was given to us when
+        // the translator was instantiated. Then, we can load the lines and return.
+        $locales = $fallback ? $this->localeArray($locale)
+                             : [$locale ?: $this->locale];
+
+        foreach ($locales as $locale) {
+            if (! is_null($line = $this->getLine(
+                $namespace, $group, $locale, $item, $replace
+            ))) {
+                break;
+            }
+        }
+
+        // If the line doesn't exist, we will return back the key which was requested as
+        // that will be quick to spot in the UI if language keys are wrong or missing
+        // from the application's language files. Otherwise we can return the line.
+        if (isset($line)) {
+            return $line;
+        }
+
+        return $key;
+    }
+
+    /**
+     * Get the translation for a given key from the JSON translation files.
+     *
+     * @param  string  $key
+     * @param  array  $replace
+     * @param  string  $locale
+     * @return string|array|null
+     */
+    public function getFromJson($key, array $replace = [], $locale = null)
     {
         $locale = $locale ?: $this->locale;
 
@@ -114,25 +161,13 @@ class Translator extends NamespacedItemResolver implements TranslatorContract
         // using the typical translation file. This way developers can always just use a
         // helper such as __ instead of having to pick between trans or __ with views.
         if (! isset($line)) {
-            [$namespace, $group, $item] = $this->parseKey($key);
+            $fallback = $this->get($key, $replace, $locale);
 
-            // Here we will get the locale that should be used for the language line. If one
-            // was not passed, we will use the default locales which was given to us when
-            // the translator was instantiated. Then, we can load the lines and return.
-            $locales = $fallback ? $this->localeArray($locale) : [$locale];
-
-            foreach ($locales as $locale) {
-                if (! is_null($line = $this->getLine(
-                    $namespace, $group, $locale, $item, $replace
-                ))) {
-                    return $line ?? $key;
-                }
+            if ($fallback !== $key) {
+                return $fallback;
             }
         }
 
-        // If the line doesn't exist, we will return back the key which was requested as
-        // that will be quick to spot in the UI if language keys are wrong or missing
-        // from the application's language files. Otherwise we can return the line.
         return $this->makeReplacements($line ?: $key, $replace);
     }
 
@@ -140,9 +175,23 @@ class Translator extends NamespacedItemResolver implements TranslatorContract
      * Get a translation according to an integer value.
      *
      * @param  string  $key
-     * @param  \Countable|int|array  $number
-     * @param  array  $replace
-     * @param  string|null  $locale
+     * @param  int|array|\Countable  $number
+     * @param  array   $replace
+     * @param  string  $locale
+     * @return string
+     */
+    public function transChoice($key, $number, array $replace = [], $locale = null)
+    {
+        return $this->choice($key, $number, $replace, $locale);
+    }
+
+    /**
+     * Get a translation according to an integer value.
+     *
+     * @param  string  $key
+     * @param  int|array|\Countable  $number
+     * @param  array   $replace
+     * @param  string  $locale
      * @return string
      */
     public function choice($key, $number, array $replace = [], $locale = null)
@@ -183,7 +232,7 @@ class Translator extends NamespacedItemResolver implements TranslatorContract
      * @param  string  $group
      * @param  string  $locale
      * @param  string  $item
-     * @param  array  $replace
+     * @param  array   $replace
      * @return string|array|null
      */
     protected function getLine($namespace, $group, $locale, $item, array $replace)
@@ -195,10 +244,6 @@ class Translator extends NamespacedItemResolver implements TranslatorContract
         if (is_string($line)) {
             return $this->makeReplacements($line, $replace);
         } elseif (is_array($line) && count($line) > 0) {
-            foreach ($line as $key => $value) {
-                $line[$key] = $this->makeReplacements($value, $replace);
-            }
-
             return $line;
         }
     }
@@ -207,7 +252,7 @@ class Translator extends NamespacedItemResolver implements TranslatorContract
      * Make the place-holder replacements on a line.
      *
      * @param  string  $line
-     * @param  array  $replace
+     * @param  array   $replace
      * @return string
      */
     protected function makeReplacements($line, array $replace)
@@ -408,10 +453,6 @@ class Translator extends NamespacedItemResolver implements TranslatorContract
      */
     public function setLocale($locale)
     {
-        if (Str::contains($locale, ['/', '\\'])) {
-            throw new InvalidArgumentException('Invalid characters present in locale.');
-        }
-
         $this->locale = $locale;
     }
 

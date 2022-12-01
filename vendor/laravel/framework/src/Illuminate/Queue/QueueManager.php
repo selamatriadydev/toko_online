@@ -3,9 +3,9 @@
 namespace Illuminate\Queue;
 
 use Closure;
+use InvalidArgumentException;
 use Illuminate\Contracts\Queue\Factory as FactoryContract;
 use Illuminate\Contracts\Queue\Monitor as MonitorContract;
-use InvalidArgumentException;
 
 /**
  * @mixin \Illuminate\Contracts\Queue\Queue
@@ -15,7 +15,7 @@ class QueueManager implements FactoryContract, MonitorContract
     /**
      * The application instance.
      *
-     * @var \Illuminate\Contracts\Foundation\Application
+     * @var \Illuminate\Foundation\Application
      */
     protected $app;
 
@@ -36,7 +36,7 @@ class QueueManager implements FactoryContract, MonitorContract
     /**
      * Create a new queue manager instance.
      *
-     * @param  \Illuminate\Contracts\Foundation\Application  $app
+     * @param  \Illuminate\Foundation\Application  $app
      * @return void
      */
     public function __construct($app)
@@ -113,7 +113,7 @@ class QueueManager implements FactoryContract, MonitorContract
     /**
      * Determine if the driver is connected.
      *
-     * @param  string|null  $name
+     * @param  string  $name
      * @return bool
      */
     public function connected($name = null)
@@ -124,7 +124,7 @@ class QueueManager implements FactoryContract, MonitorContract
     /**
      * Resolve a queue connection instance.
      *
-     * @param  string|null  $name
+     * @param  string  $name
      * @return \Illuminate\Contracts\Queue\Queue
      */
     public function connection($name = null)
@@ -178,7 +178,7 @@ class QueueManager implements FactoryContract, MonitorContract
     /**
      * Add a queue connection resolver.
      *
-     * @param  string  $driver
+     * @param  string    $driver
      * @param  \Closure  $resolver
      * @return void
      */
@@ -190,7 +190,7 @@ class QueueManager implements FactoryContract, MonitorContract
     /**
      * Add a queue connection resolver.
      *
-     * @param  string  $driver
+     * @param  string    $driver
      * @param  \Closure  $resolver
      * @return void
      */
@@ -238,7 +238,7 @@ class QueueManager implements FactoryContract, MonitorContract
     /**
      * Get the full name for the given connection.
      *
-     * @param  string|null  $connection
+     * @param  string  $connection
      * @return string
      */
     public function getName($connection = null)
@@ -247,10 +247,20 @@ class QueueManager implements FactoryContract, MonitorContract
     }
 
     /**
+     * Determine if the application is in maintenance mode.
+     *
+     * @return bool
+     */
+    public function isDownForMaintenance()
+    {
+        return $this->app->isDownForMaintenance();
+    }
+
+    /**
      * Dynamically pass calls to the default connection.
      *
      * @param  string  $method
-     * @param  array  $parameters
+     * @param  array   $parameters
      * @return mixed
      */
     public function __call($method, $parameters)

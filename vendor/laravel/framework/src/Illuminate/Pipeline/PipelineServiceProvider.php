@@ -2,12 +2,18 @@
 
 namespace Illuminate\Pipeline;
 
-use Illuminate\Contracts\Pipeline\Hub as PipelineHubContract;
-use Illuminate\Contracts\Support\DeferrableProvider;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Contracts\Pipeline\Hub as PipelineHubContract;
 
-class PipelineServiceProvider extends ServiceProvider implements DeferrableProvider
+class PipelineServiceProvider extends ServiceProvider
 {
+    /**
+     * Indicates if loading of the provider is deferred.
+     *
+     * @var bool
+     */
+    protected $defer = true;
+
     /**
      * Register the service provider.
      *

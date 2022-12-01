@@ -4,18 +4,13 @@ namespace Illuminate\Console\Scheduling;
 
 use Closure;
 use Cron\CronExpression;
-use GuzzleHttp\Client as HttpClient;
-use GuzzleHttp\Exception\TransferException;
-use Illuminate\Contracts\Container\Container;
-use Illuminate\Contracts\Debug\ExceptionHandler;
-use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Reflector;
-use Illuminate\Support\Traits\Macroable;
-use Psr\Http\Client\ClientExceptionInterface;
+use GuzzleHttp\Client as HttpClient;
+use Illuminate\Contracts\Mail\Mailer;
 use Symfony\Component\Process\Process;
+use Illuminate\Support\Traits\Macroable;
+use Illuminate\Contracts\Container\Container;
 
 class Event
 {
@@ -148,26 +143,16 @@ class Event
     public $mutex;
 
     /**
-     * The exit status code of the command.
-     *
-     * @var int|null
-     */
-    public $exitCode;
-
-    /**
      * Create a new event instance.
      *
      * @param  \Illuminate\Console\Scheduling\EventMutex  $mutex
      * @param  string  $command
-     * @param  \DateTimeZone|string|null  $timezone
      * @return void
      */
-    public function __construct(EventMutex $mutex, $command, $timezone = null)
+    public function __construct(EventMutex $mutex, $command)
     {
         $this->mutex = $mutex;
         $this->command = $command;
-        $this->timezone = $timezone;
-
         $this->output = $this->getDefaultOutput();
     }
 
@@ -178,7 +163,7 @@ class Event
      */
     public function getDefaultOutput()
     {
-        return (DIRECTORY_SEPARATOR === '\\') ? 'NUL' : '/dev/null';
+        return (DIRECTORY_SEPARATOR == '\\') ? 'NUL' : '/dev/null';
     }
 
     /**
@@ -219,7 +204,9 @@ class Event
     {
         $this->callBeforeCallbacks($container);
 
-        $this->exitCode = Process::fromShellCommandline($this->buildCommand(), base_path(), null, null, null)->run();
+        (new Process(
+            $this->buildCommand(), base_path(), null, null, null
+        ))->run();
 
         $this->callAfterCallbacks($container);
     }
@@ -234,7 +221,9 @@ class Event
     {
         $this->callBeforeCallbacks($container);
 
-        Process::fromShellCommandline($this->buildCommand(), base_path(), null, null, null)->run();
+        (new Process(
+            $this->buildCommand(), base_path(), null, null, null
+        ))->run();
     }
 
     /**
@@ -261,20 +250,6 @@ class Event
         foreach ($this->afterCallbacks as $callback) {
             $container->call($callback);
         }
-    }
-
-    /**
-     * Call all of the "after" callbacks for the event.
-     *
-     * @param  \Illuminate\Contracts\Container\Container  $container
-     * @param  int  $exitCode
-     * @return void
-     */
-    public function callAfterCallbacksWithExitCode(Container $container, $exitCode)
-    {
-        $this->exitCode = (int) $exitCode;
-
-        $this->callAfterCallbacks($container);
     }
 
     /**
@@ -364,18 +339,6 @@ class Event
     }
 
     /**
-     * Ensure that the output is stored on disk in a log file.
-     *
-     * @return $this
-     */
-    public function storeOutput()
-    {
-        $this->ensureOutputIsBeingCaptured();
-
-        return $this;
-    }
-
-    /**
      * Send the output of the command to a given location.
      *
      * @param  string  $location
@@ -413,7 +376,7 @@ class Event
      */
     public function emailOutputTo($addresses, $onlyIfOutputExists = false)
     {
-        $this->ensureOutputIsBeingCaptured();
+        $this->ensureOutputIsBeingCapturedForEmail();
 
         $addresses = Arr::wrap($addresses);
 
@@ -436,28 +399,11 @@ class Event
     }
 
     /**
-     * E-mail the results of the scheduled operation if it fails.
-     *
-     * @param  array|mixed  $addresses
-     * @return $this
-     */
-    public function emailOutputOnFailure($addresses)
-    {
-        $this->ensureOutputIsBeingCaptured();
-
-        $addresses = Arr::wrap($addresses);
-
-        return $this->onFailure(function (Mailer $mailer) use ($addresses) {
-            $this->emailOutput($mailer, $addresses, false);
-        });
-    }
-
-    /**
-     * Ensure that the command output is being captured.
+     * Ensure that output is being captured for email.
      *
      * @return void
      */
-    protected function ensureOutputIsBeingCaptured()
+    protected function ensureOutputIsBeingCapturedForEmail()
     {
         if (is_null($this->output) || $this->output == $this->getDefaultOutput()) {
             $this->sendOutputTo(storage_path('logs/schedule-'.sha1($this->mutexName()).'.log'));
@@ -507,7 +453,9 @@ class Event
      */
     public function pingBefore($url)
     {
-        return $this->before($this->pingCallback($url));
+        return $this->before(function () use ($url) {
+            (new HttpClient)->get($url);
+        });
     }
 
     /**
@@ -530,7 +478,9 @@ class Event
      */
     public function thenPing($url)
     {
-        return $this->then($this->pingCallback($url));
+        return $this->then(function () use ($url) {
+            (new HttpClient)->get($url);
+        });
     }
 
     /**
@@ -543,45 +493,6 @@ class Event
     public function thenPingIf($value, $url)
     {
         return $value ? $this->thenPing($url) : $this;
-    }
-
-    /**
-     * Register a callback to ping a given URL if the operation succeeds.
-     *
-     * @param  string  $url
-     * @return $this
-     */
-    public function pingOnSuccess($url)
-    {
-        return $this->onSuccess($this->pingCallback($url));
-    }
-
-    /**
-     * Register a callback to ping a given URL if the operation fails.
-     *
-     * @param  string  $url
-     * @return $this
-     */
-    public function pingOnFailure($url)
-    {
-        return $this->onFailure($this->pingCallback($url));
-    }
-
-    /**
-     * Get the callback that pings the given URL.
-     *
-     * @param  string  $url
-     * @return \Closure
-     */
-    protected function pingCallback($url)
-    {
-        return function (Container $container, HttpClient $http) use ($url) {
-            try {
-                $http->get($url);
-            } catch (ClientExceptionInterface | TransferException $e) {
-                $container->make(ExceptionHandler::class)->report($e);
-            }
-        };
     }
 
     /**
@@ -673,7 +584,7 @@ class Event
      */
     public function when($callback)
     {
-        $this->filters[] = Reflector::isCallable($callback) ? $callback : function () use ($callback) {
+        $this->filters[] = is_callable($callback) ? $callback : function () use ($callback) {
             return $callback;
         };
 
@@ -688,7 +599,7 @@ class Event
      */
     public function skip($callback)
     {
-        $this->rejects[] = Reflector::isCallable($callback) ? $callback : function () use ($callback) {
+        $this->rejects[] = is_callable($callback) ? $callback : function () use ($callback) {
             return $callback;
         };
 
@@ -733,36 +644,6 @@ class Event
     }
 
     /**
-     * Register a callback to be called if the operation succeeds.
-     *
-     * @param  \Closure  $callback
-     * @return $this
-     */
-    public function onSuccess(Closure $callback)
-    {
-        return $this->then(function (Container $container) use ($callback) {
-            if (0 === $this->exitCode) {
-                $container->call($callback);
-            }
-        });
-    }
-
-    /**
-     * Register a callback to be called if the operation fails.
-     *
-     * @param  \Closure  $callback
-     * @return $this
-     */
-    public function onFailure(Closure $callback)
-    {
-        return $this->then(function (Container $container) use ($callback) {
-            if (0 !== $this->exitCode) {
-                $container->call($callback);
-            }
-        });
-    }
-
-    /**
      * Set the human-friendly description of the event.
      *
      * @param  string  $description
@@ -803,16 +684,16 @@ class Event
     /**
      * Determine the next due date for an event.
      *
-     * @param  \DateTimeInterface|string  $currentTime
+     * @param  \DateTime|string  $currentTime
      * @param  int  $nth
      * @param  bool  $allowCurrentDate
      * @return \Illuminate\Support\Carbon
      */
     public function nextRunDate($currentTime = 'now', $nth = 0, $allowCurrentDate = false)
     {
-        return Date::instance(CronExpression::factory(
+        return Carbon::instance(CronExpression::factory(
             $this->getExpression()
-        )->getNextRunDate($currentTime, $nth, $allowCurrentDate, $this->timezone));
+        )->getNextRunDate($currentTime, $nth, $allowCurrentDate));
     }
 
     /**

@@ -65,7 +65,9 @@ class PackageManifest
      */
     public function providers()
     {
-        return $this->config('providers');
+        return collect($this->getManifest())->flatMap(function ($configuration) {
+            return (array) ($configuration['providers'] ?? []);
+        })->filter()->all();
     }
 
     /**
@@ -75,19 +77,8 @@ class PackageManifest
      */
     public function aliases()
     {
-        return $this->config('aliases');
-    }
-
-    /**
-     * Get all of the values for all packages for the given configuration name.
-     *
-     * @param  string  $key
-     * @return array
-     */
-    public function config($key)
-    {
-        return collect($this->getManifest())->flatMap(function ($configuration) use ($key) {
-            return (array) ($configuration[$key] ?? []);
+        return collect($this->getManifest())->flatMap(function ($configuration) {
+            return (array) ($configuration['aliases'] ?? []);
         })->filter()->all();
     }
 
@@ -105,6 +96,8 @@ class PackageManifest
         if (! file_exists($this->manifestPath)) {
             $this->build();
         }
+
+        $this->files->get($this->manifestPath, true);
 
         return $this->manifest = file_exists($this->manifestPath) ?
             $this->files->getRequire($this->manifestPath) : [];
@@ -168,7 +161,6 @@ class PackageManifest
      *
      * @param  array  $manifest
      * @return void
-     *
      * @throws \Exception
      */
     protected function write(array $manifest)
@@ -177,8 +169,9 @@ class PackageManifest
             throw new Exception('The '.dirname($this->manifestPath).' directory must be present and writable.');
         }
 
-        $this->files->replace(
-            $this->manifestPath, '<?php return '.var_export($manifest, true).';'
+        $this->files->put(
+            $this->manifestPath, '<?php return '.var_export($manifest, true).';',
+            true
         );
     }
 }

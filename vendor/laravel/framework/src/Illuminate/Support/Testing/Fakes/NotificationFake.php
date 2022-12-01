@@ -2,19 +2,14 @@
 
 namespace Illuminate\Support\Testing\Fakes;
 
-use Exception;
-use Illuminate\Contracts\Notifications\Dispatcher as NotificationDispatcher;
-use Illuminate\Contracts\Notifications\Factory as NotificationFactory;
-use Illuminate\Contracts\Translation\HasLocalePreference;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Illuminate\Support\Traits\Macroable;
+use Illuminate\Support\Collection;
 use PHPUnit\Framework\Assert as PHPUnit;
+use Illuminate\Contracts\Notifications\Factory as NotificationFactory;
+use Illuminate\Contracts\Notifications\Dispatcher as NotificationDispatcher;
 
-class NotificationFake implements NotificationDispatcher, NotificationFactory
+class NotificationFake implements NotificationFactory, NotificationDispatcher
 {
-    use Macroable;
-
     /**
      * All of the notifications that have been sent.
      *
@@ -23,29 +18,16 @@ class NotificationFake implements NotificationDispatcher, NotificationFactory
     protected $notifications = [];
 
     /**
-     * Locale used when sending notifications.
-     *
-     * @var string|null
-     */
-    public $locale;
-
-    /**
      * Assert if a notification was sent based on a truth-test callback.
      *
      * @param  mixed  $notifiable
      * @param  string  $notification
      * @param  callable|null  $callback
      * @return void
-     *
-     * @throws \Exception
      */
     public function assertSentTo($notifiable, $notification, $callback = null)
     {
         if (is_array($notifiable) || $notifiable instanceof Collection) {
-            if (count($notifiable) === 0) {
-                throw new Exception('No notifiable given.');
-            }
-
             foreach ($notifiable as $singleNotifiable) {
                 $this->assertSentTo($singleNotifiable, $notification, $callback);
             }
@@ -86,16 +68,10 @@ class NotificationFake implements NotificationDispatcher, NotificationFactory
      * @param  string  $notification
      * @param  callable|null  $callback
      * @return void
-     *
-     * @throws \Exception
      */
     public function assertNotSentTo($notifiable, $notification, $callback = null)
     {
         if (is_array($notifiable) || $notifiable instanceof Collection) {
-            if (count($notifiable) === 0) {
-                throw new Exception('No notifiable given.');
-            }
-
             foreach ($notifiable as $singleNotifiable) {
                 $this->assertNotSentTo($singleNotifiable, $notification, $callback);
             }
@@ -186,7 +162,11 @@ class NotificationFake implements NotificationDispatcher, NotificationFactory
      */
     protected function notificationsFor($notifiable, $notification)
     {
-        return $this->notifications[get_class($notifiable)][$notifiable->getKey()][$notification] ?? [];
+        if (isset($this->notifications[get_class($notifiable)][$notifiable->getKey()][$notification])) {
+            return $this->notifications[get_class($notifiable)][$notifiable->getKey()][$notification];
+        }
+
+        return [];
     }
 
     /**
@@ -206,10 +186,9 @@ class NotificationFake implements NotificationDispatcher, NotificationFactory
      *
      * @param  \Illuminate\Support\Collection|array|mixed  $notifiables
      * @param  mixed  $notification
-     * @param  array|null  $channels
      * @return void
      */
-    public function sendNow($notifiables, $notification, array $channels = null)
+    public function sendNow($notifiables, $notification)
     {
         if (! $notifiables instanceof Collection && ! is_array($notifiables)) {
             $notifiables = [$notifiables];
@@ -222,13 +201,8 @@ class NotificationFake implements NotificationDispatcher, NotificationFactory
 
             $this->notifications[get_class($notifiable)][$notifiable->getKey()][get_class($notification)][] = [
                 'notification' => $notification,
-                'channels' => $channels ?: $notification->via($notifiable),
+                'channels' => $notification->via($notifiable),
                 'notifiable' => $notifiable,
-                'locale' => $notification->locale ?? $this->locale ?? value(function () use ($notifiable) {
-                    if ($notifiable instanceof HasLocalePreference) {
-                        return $notifiable->preferredLocale();
-                    }
-                }),
             ];
         }
     }
@@ -242,18 +216,5 @@ class NotificationFake implements NotificationDispatcher, NotificationFactory
     public function channel($name = null)
     {
         //
-    }
-
-    /**
-     * Set the locale of notifications.
-     *
-     * @param  string  $locale
-     * @return $this
-     */
-    public function locale($locale)
-    {
-        $this->locale = $locale;
-
-        return $this;
     }
 }
